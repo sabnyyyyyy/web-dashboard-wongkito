@@ -15,6 +15,7 @@ import { AttendanceView } from '@/components/attendance/AttendanceView';
 import { TeamView } from '@/components/team/TeamView';
 import { ProfileView } from '@/components/profile/ProfileView';
 import { SettingsView } from '@/components/settings/SettingsView';
+import { NotificationsView } from '@/components/notifications/NotificationsView';
 import { ReceiptModal } from '@/components/common/ReceiptModal';
 
 export default function Home() {
@@ -55,6 +56,8 @@ export default function Home() {
         return <TeamView />;
       case 'reports':
         return <ReportsView />;
+      case 'notifications':
+        return <NotificationsView />;
       case 'profile':
         return <ProfileView />;
       case 'menu':

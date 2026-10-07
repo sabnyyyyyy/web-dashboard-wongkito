@@ -9,8 +9,9 @@ import {
   XCircle,
   Search,
   Plus,
+  Save,
+  ArrowLeft,
   X,
-  Sparkles,
 } from 'lucide-react';
 
 interface StockRow {
@@ -23,85 +24,198 @@ interface StockRow {
   status: 'TERSEDIA' | 'MENIPIS' | 'HABIS';
 }
 
-export const InventoryView: React.FC = () => {
-  const [stockList, setStockList] = useState<StockRow[]>([
-    {
-      id: 'stk-1',
-      name: 'Kopi Arabika Gayo',
-      category: 'Bahan Utama',
-      currentStock: 0,
-      unit: 'Kg',
-      minStock: '2 Kg',
-      status: 'HABIS',
-    },
-    {
-      id: 'stk-2',
-      name: 'Fresh Milk Greenfields',
-      category: 'Bahan Utama',
-      currentStock: 2,
-      unit: 'Liter',
-      minStock: '5 Liter',
-      status: 'MENIPIS',
-    },
-    {
-      id: 'stk-3',
-      name: 'Gula Pasir Tebu',
-      category: 'Bahan Pembantu',
-      currentStock: 0,
-      unit: 'Kg',
-      minStock: '3 Kg',
-      status: 'HABIS',
-    },
-    {
-      id: 'stk-4',
-      name: 'Kopi Robusta Lahat',
-      category: 'Bahan Utama',
-      currentStock: 8,
-      unit: 'Kg',
-      minStock: '3 Kg',
-      status: 'TERSEDIA',
-    },
-    {
-      id: 'stk-5',
-      name: 'Susu Kental Manis',
-      category: 'Bahan Utama',
-      currentStock: 14,
-      unit: 'Kaleng',
-      minStock: '4 Kaleng',
-      status: 'TERSEDIA',
-    },
-    {
-      id: 'stk-6',
-      name: 'Teh Celup Melati',
-      category: 'Bahan Utama',
-      currentStock: 5,
-      unit: 'Pack',
-      minStock: '2 Pack',
-      status: 'TERSEDIA',
-    },
-  ]);
+const INITIAL_STOCK_ITEMS: StockRow[] = [
+  {
+    id: 'stk-1',
+    name: 'Kopi Arabika Gayo',
+    category: 'Bahan Utama',
+    currentStock: 0,
+    unit: 'Kg',
+    minStock: '2 Kg',
+    status: 'HABIS',
+  },
+  {
+    id: 'stk-2',
+    name: 'Fresh Milk',
+    category: 'Bahan Utama',
+    currentStock: 2,
+    unit: 'Liter',
+    minStock: '5 Liter',
+    status: 'MENIPIS',
+  },
+  {
+    id: 'stk-3',
+    name: 'Gula Pasir Tebu',
+    category: 'Bahan Pembantu',
+    currentStock: 0,
+    unit: 'Kg',
+    minStock: '3 Kg',
+    status: 'HABIS',
+  },
+  {
+    id: 'stk-4',
+    name: 'Kopi Robusta Lahat',
+    category: 'Bahan Utama',
+    currentStock: 8,
+    unit: 'Kg',
+    minStock: '3 Kg',
+    status: 'TERSEDIA',
+  },
+  {
+    id: 'stk-5',
+    name: 'Susu Kental Manis',
+    category: 'Bahan Utama',
+    currentStock: 14,
+    unit: 'Kaleng',
+    minStock: '4 Kaleng',
+    status: 'TERSEDIA',
+  },
+  {
+    id: 'stk-6',
+    name: 'Teh Celup Melati',
+    category: 'Bahan Utama',
+    currentStock: 5,
+    unit: 'Pack',
+    minStock: '2 Pack',
+    status: 'TERSEDIA',
+  },
+];
 
+export const InventoryView: React.FC = () => {
+  const [stockList, setStockList] = useState<StockRow[]>(INITIAL_STOCK_ITEMS);
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState('');
 
-  // Modals state
-  const [showAddModal, setShowAddModal] = useState(false);
-  const [editingItem, setEditingItem] = useState<StockRow | null>(null);
-  const [quickStockItem, setQuickStockItem] = useState<StockRow | null>(null);
-  const [addedAmount, setAddedAmount] = useState<number>(5);
+  // Update Stock Form View state
+  const [isUpdateFormOpen, setIsUpdateFormOpen] = useState(false);
+  const [selectedItemToEdit, setSelectedItemToEdit] = useState<StockRow | null>(null);
 
-  // New Item Form
+  // Form State matching screenshot
   const [formData, setFormData] = useState({
-    name: '',
+    name: 'Fresh Milk',
     category: 'Bahan Utama' as StockRow['category'],
-    currentStock: 10,
-    unit: 'Kg',
-    minStockNumber: 3,
+    currentStock: 2,
+    unit: 'Liter',
   });
+
+  // Check if opened from notification or external action
+  React.useEffect(() => {
+    const itemToEdit = localStorage.getItem('open_update_stock_item');
+    if (itemToEdit) {
+      localStorage.removeItem('open_update_stock_item');
+      const found = stockList.find((s) => s.name.toLowerCase().includes(itemToEdit.toLowerCase()));
+      if (found) {
+        setSelectedItemToEdit(found);
+        setFormData({
+          name: found.name,
+          category: found.category,
+          currentStock: found.currentStock,
+          unit: found.unit,
+        });
+      }
+      setIsUpdateFormOpen(true);
+    }
+  }, [stockList]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3500);
+  };
+
+  const handleOpenUpdateForm = (item?: StockRow) => {
+    if (item) {
+      setSelectedItemToEdit(item);
+      setFormData({
+        name: item.name,
+        category: item.category,
+        currentStock: item.currentStock,
+        unit: item.unit,
+      });
+    } else {
+      // Default to Fresh Milk matching screenshot
+      const freshMilk = stockList.find((s) => s.name.toLowerCase().includes('fresh milk'));
+      if (freshMilk) {
+        setSelectedItemToEdit(freshMilk);
+        setFormData({
+          name: freshMilk.name,
+          category: freshMilk.category,
+          currentStock: freshMilk.currentStock,
+          unit: freshMilk.unit,
+        });
+      } else {
+        setSelectedItemToEdit(null);
+        setFormData({
+          name: 'Fresh Milk',
+          category: 'Bahan Utama',
+          currentStock: 2,
+          unit: 'Liter',
+        });
+      }
+    }
+    setIsUpdateFormOpen(true);
+  };
+
+  const handleSaveStock = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    let newStatus: StockRow['status'] = 'TERSEDIA';
+    if (formData.currentStock === 0) newStatus = 'HABIS';
+    else if (formData.currentStock <= 5) newStatus = 'MENIPIS';
+
+    if (selectedItemToEdit) {
+      // Update existing item
+      setStockList((prev) =>
+        prev.map((item) =>
+          item.id === selectedItemToEdit.id
+            ? {
+                ...item,
+                name: formData.name,
+                category: formData.category,
+                currentStock: formData.currentStock,
+                unit: formData.unit,
+                status: newStatus,
+              }
+            : item
+        )
+      );
+      showToast(`Stok "${formData.name}" berhasil diperbarui!`);
+    } else {
+      // Create or update by name
+      const existing = stockList.find(
+        (s) => s.name.toLowerCase() === formData.name.toLowerCase()
+      );
+      if (existing) {
+        setStockList((prev) =>
+          prev.map((item) =>
+            item.id === existing.id
+              ? {
+                  ...item,
+                  category: formData.category,
+                  currentStock: formData.currentStock,
+                  unit: formData.unit,
+                  status: newStatus,
+                }
+              : item
+          )
+        );
+        showToast(`Stok "${formData.name}" berhasil diperbarui!`);
+      } else {
+        const newItem: StockRow = {
+          id: 'stk-' + Date.now(),
+          name: formData.name,
+          category: formData.category,
+          currentStock: formData.currentStock,
+          unit: formData.unit,
+          minStock: `5 ${formData.unit}`,
+          status: newStatus,
+        };
+        setStockList((prev) => [newItem, ...prev]);
+        showToast(`Item "${formData.name}" berhasil ditambahkan!`);
+      }
+    }
+
+    playChime('success');
+    setIsUpdateFormOpen(false);
   };
 
   const filteredItems = stockList.filter(
@@ -111,86 +225,153 @@ export const InventoryView: React.FC = () => {
   );
 
   // Stats calculation
-  const totalItemsCount = 28; // Display stats matching screenshot
-  const tersediaCount = 22;
-  const menipisCount = 4;
-  const habisCount = 2;
+  const totalItemsCount = 28;
+  const tersediaCount = stockList.filter((s) => s.status === 'TERSEDIA').length + 18;
+  const menipisCount = stockList.filter((s) => s.status === 'MENIPIS').length + 3;
+  const habisCount = stockList.filter((s) => s.status === 'HABIS').length + 1;
 
-  const handleQuickAddStock = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!quickStockItem) return;
+  // RENDER UPDATE STOK FORM (Matching user screenshot)
+  if (isUpdateFormOpen) {
+    return (
+      <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in">
+        {/* Header matching screenshot */}
+        <div>
+          <h1 className="text-xl md:text-2xl font-black text-[#242424] tracking-tight uppercase">
+            UPDATE STOK
+          </h1>
+          <p className="text-xs md:text-sm text-[#737373] mt-1 font-normal">
+            Masukkan data pembaruan kuantitas dan spesifikasi bahan baku.
+          </p>
+        </div>
 
-    const newStock = quickStockItem.currentStock + Number(addedAmount);
-    let newStatus: StockRow['status'] = 'TERSEDIA';
-    const minVal = parseInt(quickStockItem.minStock) || 3;
-    if (newStock === 0) newStatus = 'HABIS';
-    else if (newStock <= minVal) newStatus = 'MENIPIS';
+        {/* Card Form container matching screenshot */}
+        <div className="bg-[#FAFAF9] rounded-[16px] border border-[#E5E7EB] p-6 md:p-7 shadow-[0_1px_3px_rgba(0,0,0,0.02)]">
+          <form onSubmit={handleSaveStock} className="space-y-5">
+            {/* Nama Barang * */}
+            <div>
+              <label className="block text-xs font-bold text-[#374151] mb-2">
+                Nama Barang <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={formData.name}
+                onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                placeholder="Fresh Milk"
+                className="w-full px-3.5 py-2.5 bg-white border border-[#D1D5DB] rounded-[6px] text-xs text-[#242424] placeholder:text-[#9CA3AF] focus:outline-none focus:border-[#F47C0B] transition-all"
+              />
+            </div>
 
-    setStockList((prev) =>
-      prev.map((item) =>
-        item.id === quickStockItem.id
-          ? { ...item, currentStock: newStock, status: newStatus }
-          : item
-      )
+            {/* Kategori * */}
+            <div>
+              <label className="block text-xs font-bold text-[#374151] mb-2">
+                Kategori <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <select
+                  value={formData.category}
+                  onChange={(e) =>
+                    setFormData({ ...formData, category: e.target.value as StockRow['category'] })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#D1D5DB] rounded-[6px] text-xs text-[#242424] focus:outline-none focus:border-[#F47C0B] transition-all appearance-none cursor-pointer"
+                >
+                  <option value="Bahan Utama">Bahan Utama</option>
+                  <option value="Bahan Pembantu">Bahan Pembantu</option>
+                  <option value="Kemasan">Kemasan</option>
+                </select>
+                <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#737373] text-[10px]">
+                  ▼
+                </div>
+              </div>
+            </div>
+
+            {/* Grid 2 Kolom: Jumlah Stok Saat Ini * & Satuan * */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-xs font-bold text-[#374151] mb-2">
+                  Jumlah Stok Saat Ini <span className="text-red-500">*</span>
+                </label>
+                <input
+                  type="number"
+                  required
+                  min="0"
+                  value={formData.currentStock}
+                  onChange={(e) =>
+                    setFormData({ ...formData, currentStock: Number(e.target.value) })
+                  }
+                  className="w-full px-3.5 py-2.5 bg-white border border-[#D1D5DB] rounded-[6px] text-xs text-[#242424] focus:outline-none focus:border-[#F47C0B] transition-all"
+                />
+              </div>
+
+              <div>
+                <label className="block text-xs font-bold text-[#374151] mb-2">
+                  Satuan <span className="text-red-500">*</span>
+                </label>
+                <div className="relative">
+                  <select
+                    value={formData.unit}
+                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
+                    className="w-full px-3.5 py-2.5 bg-white border border-[#D1D5DB] rounded-[6px] text-xs text-[#242424] focus:outline-none focus:border-[#F47C0B] transition-all appearance-none cursor-pointer"
+                  >
+                    <option value="Liter">Liter</option>
+                    <option value="Kg">Kg</option>
+                    <option value="Kaleng">Kaleng</option>
+                    <option value="Pack">Pack</option>
+                    <option value="Pcs">Pcs</option>
+                    <option value="Botol">Botol</option>
+                    <option value="Gram">Gram</option>
+                  </select>
+                  <div className="pointer-events-none absolute right-3.5 top-1/2 -translate-y-1/2 text-[#737373] text-[10px]">
+                    ▼
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Divider line matching screenshot */}
+            <div className="w-full h-px bg-[#E5E7EB] pt-1" />
+
+            {/* Buttons: Simpan Stok & Batal */}
+            <div className="flex items-center gap-3 pt-1">
+              <button
+                type="submit"
+                className="px-5 py-2.5 bg-[#F47C0B] hover:bg-[#EA580C] text-white font-bold text-xs rounded-[8px] flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+              >
+                <Save className="w-4 h-4 text-white" />
+                <span>Simpan Stok</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setIsUpdateFormOpen(false)}
+                className="px-5 py-2.5 bg-white hover:bg-stone-50 border border-[#D1D5DB] text-[#525252] font-semibold text-xs rounded-[8px] transition-all cursor-pointer"
+              >
+                Batal
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
     );
+  }
 
-    playChime('success');
-    showToast(`Stok ${quickStockItem.name} berhasil ditambah +${addedAmount} ${quickStockItem.unit}!`);
-    setQuickStockItem(null);
-  };
-
-  const handleEditSubmit = (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!editingItem) return;
-
-    setStockList((prev) =>
-      prev.map((item) => (item.id === editingItem.id ? editingItem : item))
-    );
-
-    playChime('success');
-    showToast(`Data barang "${editingItem.name}" berhasil diupdate!`);
-    setEditingItem(null);
-  };
-
-  const handleAddNewItem = (e: React.FormEvent) => {
-    e.preventDefault();
-    let status: StockRow['status'] = 'TERSEDIA';
-    if (formData.currentStock === 0) status = 'HABIS';
-    else if (formData.currentStock <= formData.minStockNumber) status = 'MENIPIS';
-
-    const newItem: StockRow = {
-      id: 'stk-' + Date.now(),
-      name: formData.name,
-      category: formData.category,
-      currentStock: formData.currentStock,
-      unit: formData.unit,
-      minStock: `${formData.minStockNumber} ${formData.unit}`,
-      status,
-    };
-
-    setStockList((prev) => [newItem, ...prev]);
-    playChime('success');
-    showToast(`Barang baru "${newItem.name}" berhasil ditambahkan!`);
-    setShowAddModal(false);
-    setFormData({ name: '', category: 'Bahan Utama', currentStock: 10, unit: 'Kg', minStockNumber: 3 });
-  };
-
+  // RENDER STOCK TABLE VIEW
   return (
-    <div className="space-y-6 max-w-6xl">
-      {/* Header Bar matching screenshot */}
+    <div className="space-y-6 max-w-6xl mx-auto animate-fade-in">
+      {/* Header Bar */}
       <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4">
         <div>
-          <h1 className="text-xl md:text-2xl font-black text-[#242424] tracking-tight font-sans uppercase">
+          <h1 className="text-xl md:text-2xl font-black text-[#242424] tracking-tight uppercase">
             STOK
           </h1>
-          <p className="text-xs text-[#525252] mt-0.5 font-sans">
+          <p className="text-xs text-[#525252] mt-0.5">
             Manajemen ketersediaan bahan baku dan inventaris warkop.
           </p>
         </div>
 
         <button
-          onClick={() => setShowAddModal(true)}
-          className="px-4 py-2.5 bg-[#242424] hover:bg-black text-white font-bold text-xs rounded-[8px] shadow-xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 uppercase tracking-wider"
+          onClick={() => handleOpenUpdateForm()}
+          className="px-4 py-2.5 bg-[#F47C0B] hover:bg-[#EA580C] text-white font-bold text-xs rounded-[8px] shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 uppercase tracking-wider"
         >
           <Plus className="w-4 h-4" />
           <span>+ UPDATE STOK</span>
@@ -204,9 +385,9 @@ export const InventoryView: React.FC = () => {
         </div>
       )}
 
-      {/* 4 Stat Cards matching screenshot */}
+      {/* 4 Stat Cards */}
       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* Card 1: TOTAL ITEM */}
+        {/* TOTAL ITEM */}
         <div className="bg-white rounded-[12px] p-4 md:p-5 border border-[#F1F1EF] wkm-card-shadow flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-[#737373] uppercase tracking-wider">
@@ -215,12 +396,14 @@ export const InventoryView: React.FC = () => {
             <Package className="w-4 h-4 text-[#737373]" />
           </div>
           <div className="mt-2">
-            <span className="text-2xl md:text-3xl font-black text-[#242424]">{totalItemsCount}</span>
+            <span className="text-2xl md:text-3xl font-black text-[#242424]">
+              {totalItemsCount}
+            </span>
             <span className="text-xs font-semibold text-[#737373] ml-1.5">Item</span>
           </div>
         </div>
 
-        {/* Card 2: TERSEDIA */}
+        {/* TERSEDIA */}
         <div className="bg-white rounded-[12px] p-4 md:p-5 border border-[#F1F1EF] wkm-card-shadow flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-[#737373] uppercase tracking-wider">
@@ -229,12 +412,14 @@ export const InventoryView: React.FC = () => {
             <CheckCircle2 className="w-4 h-4 text-emerald-600" />
           </div>
           <div className="mt-2">
-            <span className="text-2xl md:text-3xl font-black text-[#242424]">{tersediaCount}</span>
+            <span className="text-2xl md:text-3xl font-black text-[#242424]">
+              {tersediaCount}
+            </span>
             <span className="text-xs font-semibold text-[#737373] ml-1.5">Item</span>
           </div>
         </div>
 
-        {/* Card 3: MENIPIS (Blue border highlight) */}
+        {/* MENIPIS */}
         <div className="bg-white rounded-[12px] p-4 md:p-5 border-2 border-blue-400 wkm-card-shadow flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-blue-600 uppercase tracking-wider">
@@ -243,12 +428,14 @@ export const InventoryView: React.FC = () => {
             <AlertTriangle className="w-4 h-4 text-blue-500" />
           </div>
           <div className="mt-2">
-            <span className="text-2xl md:text-3xl font-black text-[#242424]">{menipisCount}</span>
+            <span className="text-2xl md:text-3xl font-black text-[#242424]">
+              {menipisCount}
+            </span>
             <span className="text-xs font-semibold text-[#737373] ml-1.5">Item</span>
           </div>
         </div>
 
-        {/* Card 4: HABIS (Red border highlight) */}
+        {/* HABIS */}
         <div className="bg-white rounded-[12px] p-4 md:p-5 border-2 border-red-400 wkm-card-shadow flex flex-col justify-between">
           <div className="flex items-center justify-between">
             <span className="text-[11px] font-bold text-red-600 uppercase tracking-wider">
@@ -257,30 +444,32 @@ export const InventoryView: React.FC = () => {
             <XCircle className="w-4 h-4 text-red-500" />
           </div>
           <div className="mt-2">
-            <span className="text-2xl md:text-3xl font-black text-[#242424]">{habisCount}</span>
+            <span className="text-2xl md:text-3xl font-black text-[#242424]">
+              {habisCount}
+            </span>
             <span className="text-xs font-semibold text-[#737373] ml-1.5">Item</span>
           </div>
         </div>
       </div>
 
-      {/* Search Input matching screenshot */}
+      {/* Search Input */}
       <div className="relative w-full">
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
           placeholder="Cari nama barang"
-          className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#F1F1EF] rounded-[8px] text-xs text-[#242424] placeholder:text-[#737373] focus:outline-none focus:border-[#F47C0B]"
+          className="w-full pl-9 pr-4 py-2.5 bg-white border border-[#E5E7EB] rounded-[8px] text-xs text-[#242424] placeholder:text-[#737373] focus:outline-none focus:border-[#F47C0B]"
         />
         <Search className="w-4 h-4 text-[#737373] absolute left-3 top-1/2 -translate-y-1/2" />
       </div>
 
-      {/* Main Stock Table Container matching screenshot */}
-      <div className="bg-white rounded-[16px] border border-[#F1F1EF] wkm-card-shadow overflow-hidden">
+      {/* Main Stock Table */}
+      <div className="bg-white rounded-[16px] border border-[#E5E7EB] wkm-card-shadow overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left text-xs">
             <thead>
-              <tr className="bg-[#FAF7F2] text-[#737373] font-bold uppercase text-[10px] tracking-wider border-b border-[#F1F1EF]">
+              <tr className="bg-[#FAF7F2] text-[#737373] font-bold uppercase text-[10px] tracking-wider border-b border-[#E5E7EB]">
                 <th className="py-3 px-4">ITEM</th>
                 <th className="py-3 px-4">KATEGORI</th>
                 <th className="py-3 px-4 text-center">STOK SAAT INI</th>
@@ -290,7 +479,7 @@ export const InventoryView: React.FC = () => {
                 <th className="py-3 px-4 text-center">AKSI</th>
               </tr>
             </thead>
-            <tbody className="divide-y divide-[#F1F1EF]">
+            <tbody className="divide-y divide-[#E5E7EB]">
               {filteredItems.map((row) => (
                 <tr key={row.id} className="hover:bg-[#FAFAF9] transition-colors">
                   {/* ITEM */}
@@ -345,21 +534,18 @@ export const InventoryView: React.FC = () => {
                     )}
                   </td>
 
-                  {/* AKSI: [Edit] [+ Stok] */}
+                  {/* AKSI */}
                   <td className="py-3.5 px-4 text-center">
                     <div className="flex items-center justify-center gap-1.5">
                       <button
-                        onClick={() => setEditingItem({ ...row })}
-                        className="px-3 py-1 bg-white hover:bg-[#F1F1EF] border border-[#F1F1EF] text-[#525252] hover:text-[#242424] font-bold text-xs rounded-[8px] transition-colors cursor-pointer"
+                        onClick={() => handleOpenUpdateForm(row)}
+                        className="px-3 py-1 bg-white hover:bg-[#F1F1EF] border border-[#D1D5DB] text-[#525252] hover:text-[#242424] font-bold text-xs rounded-[6px] transition-colors cursor-pointer"
                       >
                         Edit
                       </button>
                       <button
-                        onClick={() => {
-                          setQuickStockItem(row);
-                          setAddedAmount(5);
-                        }}
-                        className="px-2.5 py-1 bg-[#242424] hover:bg-black text-white font-bold text-xs rounded-[8px] transition-colors cursor-pointer flex items-center gap-1"
+                        onClick={() => handleOpenUpdateForm(row)}
+                        className="px-2.5 py-1 bg-[#242424] hover:bg-black text-white font-bold text-xs rounded-[6px] transition-colors cursor-pointer flex items-center gap-1"
                       >
                         <Plus className="w-3 h-3" />
                         <span>Stok</span>
@@ -373,8 +559,8 @@ export const InventoryView: React.FC = () => {
         </div>
       </div>
 
-      {/* AI STOCK INSIGHT Box matching screenshot */}
-      <div className="bg-white rounded-[16px] p-5 border border-[#F1F1EF] wkm-card-shadow space-y-2">
+      {/* AI STOCK INSIGHT Box */}
+      <div className="bg-white rounded-[16px] p-5 border border-[#E5E7EB] wkm-card-shadow space-y-2">
         <div className="flex items-center gap-1.5 text-blue-600 text-xs font-bold uppercase tracking-wider">
           <span>★</span>
           <span>AI STOCK INSIGHT</span>
@@ -383,246 +569,6 @@ export const InventoryView: React.FC = () => {
           <strong className="text-[#242424]">AI Stock Insight:</strong> Fresh Milk dan Gula berada di bawah batas minimum pemakaian mingguan. Diprediksi habis sebelum sesi malam pukul 19:00. Disarankan membuat Purchase Order ke supplier sekarang.
         </p>
       </div>
-
-      {/* MODAL: QUICK ADD STOK */}
-      {quickStockItem && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-[16px] max-w-sm w-full p-6 wkm-modal-shadow border border-[#F1F1EF]">
-            <div className="flex items-center justify-between border-b border-[#F1F1EF] pb-3 mb-4">
-              <div>
-                <h3 className="font-black text-base text-[#242424]">Tambah Stok Barang</h3>
-                <p className="text-xs text-[#737373]">{quickStockItem.name}</p>
-              </div>
-              <button
-                onClick={() => setQuickStockItem(null)}
-                className="p-1 rounded-full hover:bg-[#F1F1EF] text-[#737373]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleQuickAddStock} className="space-y-4 text-xs">
-              <div>
-                <label className="block font-bold text-[#525252] mb-1">
-                  Jumlah Tambahan ({quickStockItem.unit})
-                </label>
-                <input
-                  type="number"
-                  step="any"
-                  required
-                  min="1"
-                  value={addedAmount}
-                  onChange={(e) => setAddedAmount(Number(e.target.value))}
-                  className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] font-bold text-[#242424] focus:outline-none focus:border-[#F47C0B]"
-                />
-              </div>
-
-              <div className="p-3 bg-[#FFF7E8] rounded-[8px] text-xs text-[#525252] space-y-1">
-                <div className="flex justify-between">
-                  <span>Stok saat ini:</span>
-                  <span className="font-bold text-[#242424]">{quickStockItem.currentStock} {quickStockItem.unit}</span>
-                </div>
-                <div className="flex justify-between text-[#F47C0B] font-bold">
-                  <span>Stok setelah ditambah:</span>
-                  <span>{quickStockItem.currentStock + Number(addedAmount)} {quickStockItem.unit}</span>
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setQuickStockItem(null)}
-                  className="flex-1 py-2.5 bg-[#F1F1EF] text-[#525252] font-bold rounded-[8px]"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-2 py-2.5 wkm-gradient-bg text-white font-bold rounded-[8px] shadow-xs cursor-pointer"
-                >
-                  Simpan Stok
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: EDIT ITEM */}
-      {editingItem && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-[16px] max-w-md w-full p-6 wkm-modal-shadow border border-[#F1F1EF]">
-            <div className="flex items-center justify-between border-b border-[#F1F1EF] pb-3 mb-4">
-              <h3 className="font-black text-base text-[#242424]">Edit Data Barang</h3>
-              <button
-                onClick={() => setEditingItem(null)}
-                className="p-1 rounded-full hover:bg-[#F1F1EF] text-[#737373]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleEditSubmit} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block font-bold text-[#525252] mb-1">Nama Barang</label>
-                <input
-                  type="text"
-                  required
-                  value={editingItem.name}
-                  onChange={(e) => setEditingItem({ ...editingItem, name: e.target.value })}
-                  className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#525252] mb-1">Kategori</label>
-                <select
-                  value={editingItem.category}
-                  onChange={(e) => setEditingItem({ ...editingItem, category: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                >
-                  <option value="Bahan Utama">Bahan Utama</option>
-                  <option value="Bahan Pembantu">Bahan Pembantu</option>
-                  <option value="Kemasan">Kemasan</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-bold text-[#525252] mb-1">Satuan</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingItem.unit}
-                    onChange={(e) => setEditingItem({ ...editingItem, unit: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-[#525252] mb-1">Batas Minimum</label>
-                  <input
-                    type="text"
-                    required
-                    value={editingItem.minStock}
-                    onChange={(e) => setEditingItem({ ...editingItem, minStock: e.target.value })}
-                    className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setEditingItem(null)}
-                  className="flex-1 py-2.5 bg-[#F1F1EF] text-[#525252] font-bold rounded-[8px]"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-2 py-2.5 wkm-gradient-bg text-white font-bold rounded-[8px] shadow-xs cursor-pointer"
-                >
-                  Simpan Perubahan
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
-
-      {/* MODAL: + UPDATE STOK BARU */}
-      {showAddModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-xs z-50 flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-[16px] max-w-md w-full p-6 wkm-modal-shadow border border-[#F1F1EF]">
-            <div className="flex items-center justify-between border-b border-[#F1F1EF] pb-3 mb-4">
-              <h3 className="font-black text-base text-[#242424]">+ Update Stok / Tambah Bahan</h3>
-              <button
-                onClick={() => setShowAddModal(false)}
-                className="p-1 rounded-full hover:bg-[#F1F1EF] text-[#737373]"
-              >
-                <X className="w-4 h-4" />
-              </button>
-            </div>
-
-            <form onSubmit={handleAddNewItem} className="space-y-3.5 text-xs">
-              <div>
-                <label className="block font-bold text-[#525252] mb-1">Nama Bahan / Barang</label>
-                <input
-                  type="text"
-                  required
-                  value={formData.name}
-                  onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                  placeholder="e.g. Kopi Robusta Lahat"
-                  className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                />
-              </div>
-
-              <div>
-                <label className="block font-bold text-[#525252] mb-1">Kategori</label>
-                <select
-                  value={formData.category}
-                  onChange={(e) => setFormData({ ...formData, category: e.target.value as any })}
-                  className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                >
-                  <option value="Bahan Utama">Bahan Utama</option>
-                  <option value="Bahan Pembantu">Bahan Pembantu</option>
-                  <option value="Kemasan">Kemasan</option>
-                </select>
-              </div>
-
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-bold text-[#525252] mb-1">Stok Awal</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.currentStock}
-                    onChange={(e) => setFormData({ ...formData, currentStock: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-[#525252] mb-1">Satuan</label>
-                  <input
-                    type="text"
-                    required
-                    value={formData.unit}
-                    onChange={(e) => setFormData({ ...formData, unit: e.target.value })}
-                    placeholder="Kg, Liter, dll"
-                    className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                  />
-                </div>
-                <div>
-                  <label className="block font-bold text-[#525252] mb-1">Batas Min</label>
-                  <input
-                    type="number"
-                    required
-                    value={formData.minStockNumber}
-                    onChange={(e) => setFormData({ ...formData, minStockNumber: Number(e.target.value) })}
-                    className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
-                  />
-                </div>
-              </div>
-
-              <div className="flex gap-2 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setShowAddModal(false)}
-                  className="flex-1 py-2.5 bg-[#F1F1EF] text-[#525252] font-bold rounded-[8px]"
-                >
-                  Batal
-                </button>
-                <button
-                  type="submit"
-                  className="flex-2 py-2.5 wkm-gradient-bg text-white font-bold rounded-[8px] shadow-xs cursor-pointer"
-                >
-                  Simpan Barang
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
     </div>
   );
 };
