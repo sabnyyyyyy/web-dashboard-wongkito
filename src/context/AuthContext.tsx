@@ -1,110 +1,236 @@
+
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, {
+  createContext,
+  useContext,
+  useState,
+  useEffect,
+} from 'react';
 import { User } from '@/types';
-import { INITIAL_USERS } from '@/data/mockData';
+
+const API_URL = 'http://localhost:5000';
 
 interface AuthContextType {
   user: User | null;
   isAuthenticated: boolean;
   isLoading: boolean;
-  login: (email: string, password: string, rememberMe?: boolean) => Promise<{ success: boolean; message?: string }>;
+login: (
+  email: string,
+  password: string,
+  rememberMe?: boolean,
+  expectedRole?: 'superadmin' | 'kasir'
+) => Promise<{ success: boolean; message?: string }>;
   logout: () => void;
   demoLogin: (role: 'superadmin' | 'kasir') => void;
 }
 
-const AuthContext = createContext<AuthContextType | undefined>(undefined);
+interface BackendUser {
+  id: number;
+  name: string;
+  email: string;
+  role: 'admin' | 'superadmin';
+}
 
-export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+interface LoginResponse {
+  success: boolean;
+  message: string;
+  token?: string;
+  user?: BackendUser;
+}
+
+interface MeResponse {
+  success: boolean;
+  user?: {
+    id: number;
+    email: string;
+    role: 'admin' | 'superadmin';
+  };
+}
+
+const AuthContext = createContext<AuthContextType | undefined>(
+  undefined
+);
+
+function saveSession(
+  user: User,
+  token: string,
+  rememberMe: boolean
+) {
+  const targetStorage = rememberMe ? localStorage : sessionStorage;
+  const otherStorage = rememberMe ? sessionStorage : localStorage;
+
+  otherStorage.removeItem('wongkito_user');
+  otherStorage.removeItem('wongkito_token');
+
+  targetStorage.setItem('wongkito_user', JSON.stringify(user));
+  targetStorage.setItem('wongkito_token', token);
+}
+
+function clearSession() {
+  localStorage.removeItem('wongkito_user');
+  localStorage.removeItem('wongkito_token');
+  sessionStorage.removeItem('wongkito_user');
+  sessionStorage.removeItem('wongkito_token');
+}
+
+export const AuthProvider: React.FC<{
+  children: React.ReactNode;
+}> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check saved session in localStorage or sessionStorage
-    const savedUser = localStorage.getItem('wongkito_user') || sessionStorage.getItem('wongkito_user');
-    if (savedUser) {
+    let cancelled = false;
+
+    async function restoreSession() {
+      const token =
+        localStorage.getItem('wongkito_token') ||
+        sessionStorage.getItem('wongkito_token');
+
+      if (!token) {
+        if (!cancelled) {
+          clearSession();
+          setUser(null);
+          setIsLoading(false);
+        }
+        return;
+      }
+
       try {
-        setUser(JSON.parse(savedUser));
+        const response = await fetch(`${API_URL}/api/auth/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        if (!response.ok) {
+          throw new Error('Sesi login tidak valid atau sudah berakhir.');
+        }
+
+        const data: MeResponse = await response.json();
+
+        if (!data.success || !data.user) {
+          throw new Error('Data sesi tidak valid.');
+        }
+
+        const savedUser = localStorage.getItem('wongkito_user')
+          || sessionStorage.getItem('wongkito_user');
+
+        if (!savedUser) {
+          throw new Error('Data pengguna tidak ditemukan.');
+        }
+
+        const parsedUser = JSON.parse(savedUser) as User;
+
+
+const frontendRole =
+  data.user.role === 'superadmin' ? 'superadmin' : 'kasir';
+
+if (
+  String(parsedUser.id) !== String(data.user.id) ||
+  parsedUser.email !== data.user.email ||
+  parsedUser.role !== frontendRole
+) {
+  throw new Error('Data pengguna tidak sesuai dengan token.');
+}
+
+
+        if (!cancelled) {
+          setUser(parsedUser);
+        }
       } catch {
-        localStorage.removeItem('wongkito_user');
+        clearSession();
+
+        if (!cancelled) {
+          setUser(null);
+        }
+      } finally {
+        if (!cancelled) {
+          setIsLoading(false);
+        }
       }
     }
-    setIsLoading(false);
+
+    void restoreSession();
+
+    return () => {
+      cancelled = true;
+    };
   }, []);
 
-  const login = async (email: string, password: string, rememberMe = false): Promise<{ success: boolean; message?: string }> => {
-    // Artificial small delay for realistic UX
-    await new Promise((res) => setTimeout(res, 600));
+const login: AuthContextType['login'] = async (
+  email,
+  password,
+  rememberMe = false,
+  expectedRole
+) => {
+  
+    try {
+      const response = await fetch(`${API_URL}/api/auth/login`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          email: email.trim().toLowerCase(),
+          password,
+        }),
+      });
 
-    // Normalize input
-    const cleanEmail = email.trim().toLowerCase();
+      const data: LoginResponse = await response.json();
 
-    // Check if user exists
-    const matchedUser = INITIAL_USERS.find(
-      (u) => u.email.toLowerCase() === cleanEmail || cleanEmail === 'warkopwongkito' || cleanEmail === 'admin'
-    );
+      if (!response.ok || !data.success || !data.token || !data.user) {
+        return {
+          success: false,
+          message: data.message || 'Login gagal. Periksa email dan password.',
+        };
+      }
 
-    // Accept default credentials or demo login
-    if (
-      (cleanEmail === 'warkopwongkito@gmail.com' || cleanEmail === 'admin' || cleanEmail === 'warkopwongkito') &&
-      (password.length >= 4 || password === 'admin123')
-    ) {
-      const activeUser = matchedUser || INITIAL_USERS[0];
+const backendUser = data.user;
+
+const actualRole =
+  backendUser.role === 'superadmin' ? 'superadmin' : 'kasir';
+
+if (expectedRole && actualRole !== expectedRole) {
+  return {
+    success: false,
+    message:
+      expectedRole === 'superadmin'
+        ? 'Login ditolak. Akun ini bukan Owner Admin.'
+        : 'Login ditolak. Akun ini bukan Kasir.',
+  };
+}
+
+const activeUser: User = {
+
+  id: String(backendUser.id),
+  name: backendUser.name,
+  email: backendUser.email,
+  role: backendUser.role === 'superadmin' ? 'superadmin' : 'kasir',
+  avatar: '',
+  shift: backendUser.role === 'superadmin' ? 'Owner Shift' : 'Kasir Shift',
+};
+
+      saveSession(activeUser, data.token, rememberMe);
       setUser(activeUser);
-      if (rememberMe) {
-        localStorage.setItem('wongkito_user', JSON.stringify(activeUser));
-      } else {
-        sessionStorage.setItem('wongkito_user', JSON.stringify(activeUser));
-      }
-      return { success: true };
-    }
 
-    // Match any user in initial list with password >= 4
-    if (matchedUser && password.length >= 4) {
-      setUser(matchedUser);
-      if (rememberMe) {
-        localStorage.setItem('wongkito_user', JSON.stringify(matchedUser));
-      } else {
-        sessionStorage.setItem('wongkito_user', JSON.stringify(matchedUser));
-      }
       return { success: true };
-    }
-
-    // If custom email provided, allow logging in as custom admin for flexibility
-    if (cleanEmail && password.length >= 4) {
-      const customUser: User = {
-        id: 'u-custom',
-        name: cleanEmail.split('@')[0].toUpperCase(),
-        email: cleanEmail,
-        role: 'superadmin',
-        avatar: 'https://images.unsplash.com/photo-1535713875002-d1d0cf377fde?w=150&auto=format&fit=crop&q=80',
-        shift: 'Owner Shift',
+    } catch {
+      return {
+        success: false,
+        message: 'Tidak dapat terhubung ke backend. Pastikan server berjalan di localhost:5000.',
       };
-      setUser(customUser);
-      if (rememberMe) {
-        localStorage.setItem('wongkito_user', JSON.stringify(customUser));
-      } else {
-        sessionStorage.setItem('wongkito_user', JSON.stringify(customUser));
-      }
-      return { success: true };
     }
-
-    return {
-      success: false,
-      message: 'Email atau password salah. (Gunakan email: warkopwongkito@gmail.com / password bebas min 4 karakter)',
-    };
   };
 
-  const demoLogin = (role: 'superadmin' | 'kasir') => {
-    const targetUser = INITIAL_USERS.find((u) => u.role === role) || INITIAL_USERS[0];
-    setUser(targetUser);
-    localStorage.setItem('wongkito_user', JSON.stringify(targetUser));
+  const demoLogin: AuthContextType['demoLogin'] = () => {
+    return;
   };
 
   const logout = () => {
+    clearSession();
     setUser(null);
-    localStorage.removeItem('wongkito_user');
-    sessionStorage.removeItem('wongkito_user');
   };
 
   return (
@@ -125,8 +251,10 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
 export const useAuth = () => {
   const context = useContext(AuthContext);
+
   if (!context) {
     throw new Error('useAuth must be used within an AuthProvider');
   }
+
   return context;
 };

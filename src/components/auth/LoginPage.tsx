@@ -7,8 +7,8 @@ import { Coffee, Mail, Eye, EyeOff, CheckCircle2, ShieldCheck, Sparkles, HelpCir
 export const LoginPage: React.FC = () => {
   const { login } = useAuth();
   const [selectedRole, setSelectedRole] = useState<'superadmin' | 'kasir'>('superadmin');
-  const [email, setEmail] = useState('warkopwongkito@gmail.com');
-  const [password, setPassword] = useState('admin123');
+  const [email, setEmail] = useState('adminwkm@example.com');
+  const [password, setPassword] = useState('');
   const [rememberMe, setRememberMe] = useState(true);
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -16,30 +16,30 @@ export const LoginPage: React.FC = () => {
   const [showForgotModal, setShowForgotModal] = useState(false);
   const [forgotSent, setForgotSent] = useState(false);
 
-  const handleRoleChange = (role: 'superadmin' | 'kasir') => {
-    setSelectedRole(role);
-    setErrorMessage('');
-    if (role === 'superadmin') {
-      setEmail('warkopwongkito@gmail.com');
-      setPassword('admin123');
-    } else {
-      setEmail('siti.kasir@wongkito.com');
-      setPassword('kasir123');
-    }
-  };
 
-  const handleSubmit = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setErrorMessage('');
-    setIsLoading(true);
+const handleRoleChange = (role: 'superadmin' | 'kasir') => {
+  setSelectedRole(role);
+  setEmail('');
+  setPassword('');
+  setErrorMessage('');
+};
 
-    const res = await login(email, password, rememberMe);
-    setIsLoading(false);
 
-    if (!res.success) {
-      setErrorMessage(res.message || 'Gagal masuk. Silakan cek data Anda.');
-    }
-  };
+ const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
+  e.preventDefault();
+  setErrorMessage('');
+  setIsLoading(true);
+
+  const result = await login(email, password, rememberMe, selectedRole);
+
+  setIsLoading(false);
+
+  if (!result.success) {
+    setErrorMessage(
+      result.message || 'Gagal masuk. Silakan cek data Anda.'
+    );
+  }
+};
 
   return (
     <div className="min-h-screen w-full bg-[#1A1A1A] flex flex-col items-center justify-center p-4 relative overflow-hidden font-sans">
