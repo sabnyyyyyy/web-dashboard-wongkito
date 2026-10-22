@@ -1,0 +1,110 @@
+@import "tailwindcss";
+
+:root {
+  --wkm-orange: #F59E0B;
+  --wkm-dark-orange: #D97706;
+  --wkm-gold-orange: #FFB21A;
+  --wkm-deep-orange: #F47C0B;
+  --wkm-dark: #242424;
+  --wkm-dark-gray: #525252;
+  --wkm-gray: #737373;
+  --wkm-soft-white: #FAFAF9;
+  --wkm-cream: #FFF7E8;
+  --wkm-light-gray: #F1F1EF;
+}
+
+@theme {
+  --color-wkm-orange: #F59E0B;
+  --color-wkm-dark-orange: #D97706;
+  --color-wkm-gold-orange: #FFB21A;
+  --color-wkm-deep-orange: #F47C0B;
+  --color-wkm-dark: #242424;
+  --color-wkm-dark-gray: #525252;
+  --color-wkm-gray: #737373;
+  --color-wkm-soft-white: #FAFAF9;
+  --color-wkm-cream: #FFF7E8;
+  --color-wkm-light-gray: #F1F1EF;
+  
+  --radius-button: 8px;
+  --radius-card: 12px;
+  --radius-container: 16px;
+  --radius-chip: 20px;
+}
+
+body {
+  background-color: #FAFAF9;
+  color: #242424;
+  font-family: var(--font-outfit), var(--font-inter), system-ui, -apple-system, sans-serif;
+}
+
+/* WKM Primary Gradient */
+.wkm-gradient-bg {
+  background: linear-gradient(135deg, #FFB21A 0%, #F47C0B 100%);
+}
+
+.wkm-gradient-bg-hover:hover {
+  background: linear-gradient(135deg, #F47C0B 0%, #D97706 100%);
+}
+
+/* WKM Standard Shadows */
+.wkm-card-shadow {
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.06);
+}
+
+.wkm-modal-shadow {
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.10);
+}
+
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: scale(0.98);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+
+.animate-fade-in {
+  animation: fadeIn 0.16s ease-out forwards;
+}
+
+/* Custom Scrollbars */
+::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: #E5E5E3;
+  border-radius: 9999px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: #D4D4D0;
+}
+
+/* Print thermal receipt settings */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  #thermal-receipt, #thermal-receipt * {
+    visibility: visible;
+  }
+  #thermal-receipt {
+    position: absolute;
+    left: 0;
+    top: 0;
+    width: 100%;
+    margin: 0;
+    padding: 10px;
+    border: none;
+    box-shadow: none;
+  }
+}
