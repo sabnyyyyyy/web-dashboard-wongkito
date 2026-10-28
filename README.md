@@ -23,29 +23,32 @@ dashboard-wongkito/
 ├── src/
 │   ├── app/                    # Next.js App Router root
 │   │   ├── layout.tsx          # Root layout, penyedia Auth & App Provider, font
-│   │   ├── page.tsx            # Entry point utama (conditional rendering per role & tab)
+│   │   ├── page.tsx            # Redirect ke /dashboard (sudah login) atau /login
 │   │   ├── globals.css         # Konfigurasi Tailwind CSS, font, & styling cetak struk (@media print)
 │   │   ├── api/                # Route handler backend (auth & manajemen akun)
-│   │   ├── _components/        # Modul UI berbasis fitur (private folder, tidak jadi route)
-│   │   │   ├── attendance/     # View absensi dan pencatatan kehadiran staf
-│   │   │   ├── auth/           # Halaman login & otentikasi
-│   │   │   ├── common/         # Komponen global (ReceiptModal untuk nota belanja)
-│   │   │   ├── dashboard/      # Ringkasan analitik dan KPI operasional (Owner & Kasir)
-│   │   │   ├── inventory/      # Manajemen bahan baku dan peringatan stok menipis
-│   │   │   ├── layout/         # Shell navigasi (Sidebar responsif, Header, Topbar, Search)
-│   │   │   ├── menu/           # CRUD katalog produk dan toggle ketersediaan menu
-│   │   │   ├── notifications/  # Panel notifikasi pesanan masuk & peringatan stok
-│   │   │   ├── orders/         # Monitor pesanan aktif, filter status, dan alur dapur
-│   │   │   ├── pos/            # Interface transaksi kasir cepat (Point of Sale)
-│   │   │   ├── profile/        # Profil akun pengguna dan shift kerja
-│   │   │   ├── reports/        # Rekap penjualan dan laporan pendapatan
-│   │   │   ├── settings/       # Konfigurasi outlet (pajak PB1, alamat, printer, footer nota)
-│   │   │   └── team/           # Manajemen data staf, kasir, dan jadwal shift
+│   │   ├── (auth)/login/       # Halaman /login (+ _components/LoginPage.tsx)
+│   │   ├── (dashboard)/        # Semua halaman setelah login, tiap fitur punya URL sendiri
+│   │   │   ├── layout.tsx      # Guard login & role, shell DashboardLayout, ReceiptModal
+│   │   │   ├── dashboard/      # /dashboard     – ringkasan analitik dan KPI operasional
+│   │   │   ├── pos/            # /pos           – interface transaksi kasir (Point of Sale)
+│   │   │   ├── orders/         # /orders        – monitor pesanan aktif dan alur dapur
+│   │   │   ├── menu/           # /menu          – CRUD katalog produk (Owner)
+│   │   │   ├── inventory/      # /inventory     – bahan baku dan peringatan stok menipis
+│   │   │   ├── reports/        # /reports       – rekap penjualan dan laporan pendapatan
+│   │   │   ├── attendance/     # /attendance    – absensi dan kehadiran staf
+│   │   │   ├── team/           # /team          – manajemen akun kasir (Owner)
+│   │   │   ├── notifications/  # /notifications – notifikasi pesanan & stok
+│   │   │   ├── profile/        # /profile       – profil akun dan ganti password
+│   │   │   └── settings/       # /settings      – konfigurasi outlet (Owner)
+│   │   │                       #   (tiap folder: page.tsx + _components/<View>.tsx)
+│   │   ├── _components/        # Komponen bersama (private folder, tidak jadi route)
+│   │   │   ├── common/         # ReceiptModal untuk nota belanja
+│   │   │   └── layout/         # Shell navigasi (Sidebar responsif, Header, Topbar, Search)
 │   │   ├── _context/           # Global State Management
 │   │   │   ├── AppContext.tsx  # State bisnis (menu, pesanan, keranjang POS, stok, setting)
 │   │   │   └── AuthContext.tsx # State autentikasi sesi pengguna (Owner / Kasir)
 │   │   ├── _data/
-│   │   │   └── mockData.ts     # Data awal (katalog menu, pesanan awal, stok, akun staf)
+│   │   │   └── mockData.ts     # Data awal (katalog menu, pesanan awal, stok)
 │   │   └── _utils/
 │   │       └── format.ts       # Format mata uang Rupiah, waktu lokal, dan Web Audio chime
 │   ├── lib/                    # Helper bersama client & server (akses role, aturan password)
@@ -69,7 +72,7 @@ flowchart TD
     Layout --> AppCtx[AppContext.tsx\nGlobal State]
     AppCtx <--> LocalStorage[(Local Storage)]
     
-    Layout --> Views{Navigasi Berdasarkan activeTab}
+    Layout --> Views{Navigasi Berdasarkan URL}
     Views -->|dashboard| OwnerView[OwnerDashboardView.tsx\nKPI & Ringkasan Operasional]
     Views -->|pos| PosView[PosView.tsx\nPemilihan Menu & Keranjang Kasir]
     Views -->|orders| OrdersView[OrdersView.tsx\nMonitor Status Pesanan Dapur]
@@ -84,11 +87,12 @@ flowchart TD
 - Mendukung 2 role pengguna:
   - **`superadmin` (Owner):** Akses penuh ke seluruh menu (Dashboard KPI, Laporan Keuangan, Team, Stok, dll).
   - **`kasir` (Staff Kasir):** Fokus ke fungsi harian kasir (POS Kasir, Pesanan Dapur, Cek Stok, Absensi).
-- Sesi login disimpan secara otomatis di `localStorage` (jika memilih opsi *Remember Me*) atau `sessionStorage`.
+- Sesi login disimpan di server (PostgreSQL); browser hanya memegang cookie httpOnly. *Ingat saya* membuat cookie bertahan setelah browser ditutup.
 
-### 2. Single-Page Navigation Tab (`page.tsx`)
-- Menggunakan pendekatan tab dinamis tanpa page reload browser.
-- State `activeTab` dikelola secara global di `AppContext`, merender komponen tampilan sesuai tab yang dipilih pada sidebar.
+### 2. Navigasi Berbasis URL (`src/app/(dashboard)/`)
+- Tiap fitur punya halaman sendiri (`/pos`, `/orders`, `/team`, ...), jadi bisa di-bookmark dan tombol back browser berfungsi.
+- `activeTab` di `AppContext` dibaca dari URL; `setActiveTab('pos')` sama dengan pindah ke `/pos`.
+- `(dashboard)/layout.tsx` mengarahkan pengguna yang belum login ke `/login`, dan role yang tidak berhak (misalnya kasir membuka `/team`) ke `/dashboard`.
 
 ### 3. POS Kasir & Cetak Struk (`PosView.tsx` & `ReceiptModal.tsx`)
 - Pemilihan menu instan dengan filter kategori (*Kopi, Non-Kopi, Makanan, Cemilan, Signature*).

@@ -1,6 +1,7 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import { usePathname, useRouter } from 'next/navigation';
 import {
   MenuItem,
   Order,
@@ -32,6 +33,21 @@ export type DashboardTab =
   | 'notifications'
   | 'profile'
   | 'settings';
+
+const DASHBOARD_TABS: readonly DashboardTab[] = [
+  'dashboard',
+  'overview',
+  'pos',
+  'orders',
+  'menu',
+  'inventory',
+  'reports',
+  'attendance',
+  'team',
+  'notifications',
+  'profile',
+  'settings',
+];
 
 export interface AppNotification {
   id: string;
@@ -114,7 +130,15 @@ interface AppContextType {
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [activeTab, setActiveTab] = useState<DashboardTab>('overview');
+  // Every tab is its own route (/pos, /team, ...), so the active tab is read from the URL.
+  const router = useRouter();
+  const pathname = usePathname();
+  const segment = pathname.split('/')[1] as DashboardTab;
+  const activeTab: DashboardTab = DASHBOARD_TABS.includes(segment) ? segment : 'dashboard';
+  const setActiveTab = useCallback(
+    (tab: DashboardTab) => router.push(tab === 'overview' ? '/dashboard' : `/${tab}`),
+    [router]
+  );
   const [isOpenStore, setIsOpenStore] = useState<boolean>(true);
   const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_MENU);
   const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
