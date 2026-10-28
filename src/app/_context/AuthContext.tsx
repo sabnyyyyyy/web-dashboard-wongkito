@@ -3,6 +3,7 @@
 import React, { createContext, useContext, useState, useEffect, useMemo, useCallback } from 'react';
 import { StaffAccount, User } from '@/types';
 import { generateLoginId } from '@/lib/access';
+import { api, ApiError } from '@/app/_utils/api';
 
 // Auth state comes from the server (/api/auth/*, /api/accounts/*). The session lives in an
 // httpOnly cookie, so nothing about the login is stored in or trusted from the browser.
@@ -30,35 +31,6 @@ interface AuthContextType {
   updateKasirAccount: (loginId: string, update: KasirAccountUpdate) => Promise<StaffAccount>;
   resetKasirPassword: (loginId: string) => Promise<string>;
 }
-
-class ApiError extends Error {
-  constructor(
-    public status: number,
-    message: string
-  ) {
-    super(message);
-  }
-}
-
-const api = async <T,>(path: string, init: { method?: string; body?: unknown } = {}): Promise<T> => {
-  let res: Response;
-  try {
-    res = await fetch(path, {
-      method: init.method ?? 'GET',
-      headers: init.body !== undefined ? { 'Content-Type': 'application/json' } : undefined,
-      body: init.body !== undefined ? JSON.stringify(init.body) : undefined,
-      credentials: 'same-origin',
-      cache: 'no-store',
-    });
-  } catch {
-    throw new ApiError(0, 'Tidak bisa terhubung ke server. Cek koneksi internet.');
-  }
-
-  if (res.status === 204) return undefined as T;
-  const data = await res.json().catch(() => null);
-  if (!res.ok) throw new ApiError(res.status, data?.error ?? `Permintaan gagal (${res.status}).`);
-  return data as T;
-};
 
 const toResult = (err: unknown): AuthResult => ({
   success: false,

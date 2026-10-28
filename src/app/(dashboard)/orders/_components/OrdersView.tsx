@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/app/_context/AppContext';
-import { formatRupiah, playChime } from '@/app/_utils/format';
+import { formatDateTime, formatRupiah, playChime } from '@/app/_utils/format';
+import { MenuItem, Order, OrderStatus } from '@/types';
 import {
   Search,
   Plus,
@@ -25,130 +26,119 @@ interface CustomOrderItem {
   icon?: string;
 }
 
+type CustomOrderStatus = 'BARU' | 'DITERIMA' | 'DIPROSES' | 'SIAP DIAMBIL' | 'SELESAI' | 'BATAL';
+
 interface CustomOrder {
   id: string;
   orderNumber: string;
   customerName: string;
   items: CustomOrderItem[];
-  orderType: 'TAKE AWAY' | 'DINE-IN';
+  orderType: 'TAKE AWAY' | 'DINE-IN' | 'DELIVERY';
   total: number;
   subtotal: number;
-  paymentMethod: 'QRIS' | 'Cash';
+  paymentMethod: 'QRIS' | 'Tunai' | 'Transfer' | 'Debit';
   paymentStatus: 'Paid' | 'Unpaid';
-  status: 'BARU' | 'DITERIMA' | 'DIPROSES' | 'SIAP DIAMBIL' | 'SELESAI' | 'BATAL';
+  status: CustomOrderStatus;
   orderTime: string;
   customerNote?: string;
   step: 1 | 2 | 3 | 4;
 }
 
-export const OrdersView: React.FC = () => {
-  const { setActiveTab, setLastCompletedOrder, setShowReceiptModal } = useApp();
+// Kitchen labels used on this page ↔ statuses stored on the server.
+const STATUS_LABEL: Record<OrderStatus, CustomOrderStatus> = {
+  pending: 'BARU',
+  accepted: 'DITERIMA',
+  processing: 'DIPROSES',
+  ready: 'SIAP DIAMBIL',
+  completed: 'SELESAI',
+  cancelled: 'BATAL',
+};
+const STATUS_FROM_LABEL = Object.fromEntries(
+  Object.entries(STATUS_LABEL).map(([status, label]) => [label, status])
+) as Record<CustomOrderStatus, OrderStatus>;
 
-  const [orderList, setOrderList] = useState<CustomOrder[]>([
-    {
-      id: 'WK-001',
-      orderNumber: '#WK-001',
-      customerName: 'Budi Santoso',
-      items: [
-        { name: 'Kopi Susu Wongkito', notes: 'Extra gula aren, less ice', qty: 1, price: 18000, icon: '☕' },
-        { name: 'Pisang Goreng Keju', notes: 'Tambah cokelat topping', qty: 1, price: 14000, icon: '🍌' },
-      ],
-      orderType: 'TAKE AWAY',
-      subtotal: 32000,
-      total: 32000,
-      paymentMethod: 'QRIS',
-      paymentStatus: 'Paid',
-      status: 'DIPROSES',
-      orderTime: '23 Sep 2026, 09:14',
-      customerNote: 'Tolong dibungkus rapi, mau dibawa naik motor.',
-      step: 2,
-    },
-    {
-      id: 'WK-002',
-      orderNumber: '#WK-002',
-      customerName: 'Siti Aisyah',
-      items: [
-        { name: 'Cafe Latte', qty: 1, price: 25000, icon: '☕' },
-      ],
-      orderType: 'DINE-IN',
-      subtotal: 25000,
-      total: 25000,
-      paymentMethod: 'Cash',
-      paymentStatus: 'Unpaid',
-      status: 'BARU',
-      orderTime: '23 Sep 2026, 09:22',
-      customerNote: 'Meja 04, tolong gulanya dipisah.',
-      step: 1,
-    },
-    {
-      id: 'WK-003',
-      orderNumber: '#WK-003',
-      customerName: 'Rizky Maulana',
-      items: [
-        { name: 'Americano', qty: 1, price: 20000, icon: '☕' },
-      ],
-      orderType: 'TAKE AWAY',
-      subtotal: 20000,
-      total: 20000,
-      paymentMethod: 'QRIS',
-      paymentStatus: 'Paid',
-      status: 'BARU',
-      orderTime: '23 Sep 2026, 09:30',
-      step: 1,
-    },
-    {
-      id: 'WK-004',
-      orderNumber: '#WK-004',
-      customerName: 'Hendra Kusuma',
-      items: [
-        { name: 'Roti Bakar Cokelat', qty: 1, price: 18000, icon: '🍞' },
-        { name: 'Es Teh Manis', qty: 1, price: 10000, icon: '🧋' },
-      ],
-      orderType: 'DINE-IN',
-      subtotal: 28000,
-      total: 28000,
-      paymentMethod: 'QRIS',
-      paymentStatus: 'Paid',
-      status: 'SIAP DIAMBIL',
-      orderTime: '23 Sep 2026, 09:05',
-      step: 3,
-    },
-    {
-      id: 'WK-005',
-      orderNumber: '#WK-005',
-      customerName: 'Dewi Lestari',
-      items: [
-        { name: 'Kopi Tarik', qty: 2, price: 30000, icon: '☕' },
-        { name: 'Pisang Goreng', qty: 1, price: 14500, icon: '🍌' },
-      ],
-      orderType: 'DINE-IN',
-      subtotal: 44500,
-      total: 44500,
-      paymentMethod: 'Cash',
-      paymentStatus: 'Paid',
-      status: 'SELESAI',
-      orderTime: '23 Sep 2026, 08:45',
-      step: 4,
-    },
-  ]);
+const STEP: Record<CustomOrderStatus, CustomOrder['step']> = {
+  BARU: 1,
+  DITERIMA: 1,
+  DIPROSES: 2,
+  'SIAP DIAMBIL': 3,
+  SELESAI: 4,
+  BATAL: 1,
+};
+
+const ORDER_TYPE_LABEL: Record<Order['orderType'], CustomOrder['orderType']> = {
+  dine_in: 'DINE-IN',
+  takeaway: 'TAKE AWAY',
+  delivery: 'DELIVERY',
+};
+
+const PAYMENT_LABEL: Record<Order['paymentMethod'], CustomOrder['paymentMethod']> = {
+  cash: 'Tunai',
+  qris: 'QRIS',
+  transfer: 'Transfer',
+  debit: 'Debit',
+};
+
+const CATEGORY_ICON: Record<MenuItem['category'], string> = {
+  kopi: '☕',
+  'non-kopi': '🧋',
+  makanan: '🍛',
+  cemilan: '🍌',
+  signature: '⭐',
+};
+
+const toCustomOrder = (order: Order): CustomOrder => {
+  const status = STATUS_LABEL[order.status];
+  const note = [order.tableNumber, order.notes].filter(Boolean).join(' • ');
+  return {
+    id: order.id,
+    orderNumber: order.orderNumber,
+    customerName: order.customerName,
+    items: order.items.map((ci) => ({
+      name: ci.menuItem.name,
+      notes: ci.notes || undefined,
+      qty: ci.quantity,
+      price: ci.menuItem.price * ci.quantity,
+      icon: CATEGORY_ICON[ci.menuItem.category],
+    })),
+    orderType: ORDER_TYPE_LABEL[order.orderType],
+    subtotal: order.subtotal,
+    total: order.total,
+    paymentMethod: PAYMENT_LABEL[order.paymentMethod],
+    paymentStatus: order.paymentStatus === 'paid' ? 'Paid' : 'Unpaid',
+    status,
+    orderTime: formatDateTime(order.createdAt),
+    ...(note ? { customerNote: note } : {}),
+    step: STEP[status],
+  };
+};
+
+export const OrdersView: React.FC = () => {
+  const { orders, updateOrderStatus, setActiveTab, setLastCompletedOrder, setShowReceiptModal } = useApp();
+
+  const orderList = orders.map(toCustomOrder);
 
   const [searchQuery, setSearchQuery] = useState('');
   const [activeFilter, setActiveFilter] = useState<'SEMUA' | 'BARU' | 'DITERIMA' | 'DIPROSES' | 'SIAP' | 'SELESAI'>('SEMUA');
-  const [selectedOrder, setSelectedOrder] = useState<CustomOrder | null>(null);
+  // Keep only the id, so the detail view follows status changes and background refreshes.
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
+  const selectedOrder = orderList.find((o) => o.id === selectedOrderId) ?? null;
+  const setSelectedOrder = (ord: CustomOrder | null) => setSelectedOrderId(ord?.id ?? null);
   const [toastMessage, setToastMessage] = useState('');
 
+  const countStatus = (status: CustomOrderStatus) => orderList.filter((o) => o.status === status).length;
   const filterCounts = {
-    SEMUA: 12,
-    BARU: 5,
-    DITERIMA: 2,
-    DIPROSES: 3,
-    SIAP: 2,
-    SELESAI: 18,
+    SEMUA: orderList.length,
+    BARU: countStatus('BARU'),
+    DITERIMA: countStatus('DITERIMA'),
+    DIPROSES: countStatus('DIPROSES'),
+    SIAP: countStatus('SIAP DIAMBIL'),
+    SELESAI: countStatus('SELESAI'),
   };
 
   const filteredOrders = orderList.filter((ord) => {
     const matchesSearch =
-      ord.id.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      ord.orderNumber.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ord.customerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
       ord.items.some((i) => i.name.toLowerCase().includes(searchQuery.toLowerCase()));
 
@@ -165,65 +155,26 @@ export const OrdersView: React.FC = () => {
     setTimeout(() => setToastMessage(''), 3500);
   };
 
-  const handleUpdateStatus = (orderId: string, newStatus: CustomOrder['status'], nextStep: 1 | 2 | 3 | 4) => {
-    setOrderList((prev) =>
-      prev.map((o) =>
-        o.id === orderId ? { ...o, status: newStatus, step: nextStep } : o
-      )
-    );
-    if (selectedOrder && selectedOrder.id === orderId) {
-      setSelectedOrder((prev) => (prev ? { ...prev, status: newStatus, step: nextStep } : null));
-    }
+  const orderNumberOf = (orderId: string) => orderList.find((o) => o.id === orderId)?.orderNumber ?? orderId;
+
+  // The step comes from the status, so the second argument is only kept for the existing call sites.
+  const handleUpdateStatus = async (orderId: string, newStatus: CustomOrderStatus, _nextStep: 1 | 2 | 3 | 4) => {
+    if (!(await updateOrderStatus(orderId, STATUS_FROM_LABEL[newStatus]))) return;
     playChime('success');
-    showToast(`Status pesanan ${orderId} berhasil diperbarui menjadi "${newStatus}"!`);
+    showToast(`Status pesanan ${orderNumberOf(orderId)} berhasil diperbarui menjadi "${newStatus}"!`);
   };
 
-  const handleCancelOrder = (orderId: string) => {
-    if (confirm(`Yakin ingin membatalkan pesanan ${orderId}?`)) {
-      setOrderList((prev) =>
-        prev.map((o) => (o.id === orderId ? { ...o, status: 'BATAL' } : o))
-      );
-      if (selectedOrder && selectedOrder.id === orderId) {
-        setSelectedOrder((prev) => (prev ? { ...prev, status: 'BATAL' } : null));
-      }
-      playChime('alert');
-      showToast(`Pesanan ${orderId} telah dibatalkan.`);
-    }
+  const handleCancelOrder = async (orderId: string) => {
+    if (!confirm(`Yakin ingin membatalkan pesanan ${orderNumberOf(orderId)}?`)) return;
+    if (!(await updateOrderStatus(orderId, 'cancelled'))) return;
+    playChime('alert');
+    showToast(`Pesanan ${orderNumberOf(orderId)} telah dibatalkan.`);
   };
 
   const handlePrintReceipt = (ord: CustomOrder) => {
-    setLastCompletedOrder({
-      id: ord.id,
-      orderNumber: ord.id,
-      customerName: ord.customerName,
-      orderType: ord.orderType === 'DINE-IN' ? 'dine_in' : 'takeaway',
-      items: ord.items.map((i) => ({
-        menuItem: {
-          id: i.name,
-          name: i.name,
-          category: 'kopi',
-          price: i.price,
-          costPrice: i.price * 0.5,
-          description: i.notes || '',
-          image: '',
-          isAvailable: true,
-          stock: 10,
-        },
-        quantity: i.qty,
-        notes: i.notes,
-      })),
-      subtotal: ord.subtotal,
-      tax: 0,
-      discount: 0,
-      total: ord.total,
-      paymentMethod: ord.paymentMethod.toLowerCase() as any,
-      paymentStatus: ord.paymentStatus === 'Paid' ? 'paid' : 'unpaid',
-      amountPaid: ord.total,
-      change: 0,
-      status: ord.status === 'SELESAI' ? 'completed' : 'processing',
-      createdAt: new Date().toISOString(),
-      cashierName: 'Kasir Wong Kito',
-    });
+    const order = orders.find((o) => o.id === ord.id);
+    if (!order) return;
+    setLastCompletedOrder(order);
     setShowReceiptModal(true);
   };
 
@@ -597,7 +548,7 @@ export const OrdersView: React.FC = () => {
                 <tr key={ord.id} className="hover:bg-[#FAFAF9] transition-colors">
                   {/* ORDER ID */}
                   <td className="py-3.5 px-4 font-mono font-bold text-[#242424]">
-                    {ord.id}
+                    {ord.orderNumber}
                   </td>
 
                   {/* CUSTOMER */}

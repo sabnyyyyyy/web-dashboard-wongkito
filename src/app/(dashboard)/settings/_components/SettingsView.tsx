@@ -21,9 +21,9 @@ export const SettingsView: React.FC = () => {
   const [formState, setFormState] = useState({ ...settings });
   const [savedSuccess, setSavedSuccess] = useState(false);
 
-  const handleSave = (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
-    updateSettings(formState);
+    if (!(await updateSettings(formState))) return;
     playChime('success');
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);

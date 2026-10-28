@@ -2,7 +2,6 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/app/_context/AppContext';
-import { useAuth } from '@/app/_context/AuthContext';
 import { MenuItem, MenuCategory, OrderType, PaymentMethod } from '@/types';
 import { formatRupiah, playChime } from '@/app/_utils/format';
 import confetti from 'canvas-confetti';
@@ -25,7 +24,6 @@ import {
 } from 'lucide-react';
 
 export const PosView: React.FC = () => {
-  const { user } = useAuth();
   const {
     menuItems,
     cart,
@@ -56,6 +54,7 @@ export const PosView: React.FC = () => {
   const [cashGiven, setCashGiven] = useState<number>(0);
   const [voucherCode, setVoucherCode] = useState('');
   const [voucherError, setVoucherError] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   // Filter menu
   const filteredMenu = menuItems.filter((item) => {
@@ -98,27 +97,27 @@ export const PosView: React.FC = () => {
     setShowPaymentModal(true);
   };
 
-  const handleCompleteTransaction = () => {
+  const handleCompleteTransaction = async () => {
+    if (isSubmitting) return;
     if (paymentMethod === 'cash' && cashGiven < grandTotal) {
       alert('Jumlah uang tunai kurang dari total tagihan!');
       playChime('alert');
       return;
     }
 
-    createOrder({
+    // The server recomputes the totals and records the logged-in account as cashier.
+    setIsSubmitting(true);
+    const order = await createOrder({
       customerName: cartCustomerName || 'Pelanggan',
       tableNumber: cartOrderType === 'dine_in' ? cartTableNumber : undefined,
       orderType: cartOrderType,
       items: [...cart],
-      subtotal,
-      tax,
       discount: cartDiscount,
-      total: grandTotal,
       paymentMethod,
       amountPaid: paymentMethod === 'cash' ? cashGiven : grandTotal,
-      cashierName: user?.name || 'Kasir',
-      notes: '',
     });
+    setIsSubmitting(false);
+    if (!order) return;
 
     playChime('success');
     try {
@@ -668,10 +667,11 @@ export const PosView: React.FC = () => {
               </button>
               <button
                 onClick={handleCompleteTransaction}
-                className="flex-2 py-2.5 wkm-gradient-bg text-white font-bold text-xs rounded-[8px] shadow-sm flex items-center justify-center gap-1 cursor-pointer uppercase tracking-wider"
+                disabled={isSubmitting}
+                className="flex-2 py-2.5 wkm-gradient-bg text-white font-bold text-xs rounded-[8px] shadow-sm flex items-center justify-center gap-1 cursor-pointer uppercase tracking-wider disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Check className="w-3.5 h-3.5" />
-                <span>Selesaikan Transaksi</span>
+                <span>{isSubmitting ? 'Memproses...' : 'Selesaikan Transaksi'}</span>
               </button>
             </div>
           </div>

@@ -10,7 +10,7 @@ import { canAccessTab } from '@/lib/access';
 
 export default function DashboardGroupLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const { activeTab } = useApp();
+  const { activeTab, isDataLoading } = useApp();
   const router = useRouter();
 
   const isTabAllowed = canAccessTab(user?.role, activeTab);
@@ -23,7 +23,8 @@ export default function DashboardGroupLayout({ children }: { children: React.Rea
     else if (!isTabAllowed) router.replace('/dashboard');
   }, [isLoading, isAuthenticated, isTabAllowed, router]);
 
-  if (isLoading || !isAuthenticated || !isTabAllowed) {
+  // Also wait for the first data load, so forms (e.g. Settings) start from the real values.
+  if (isLoading || !isAuthenticated || !isTabAllowed || isDataLoading) {
     return (
       <div className="min-h-screen bg-[#1A1A1A] flex flex-col items-center justify-center text-white font-sans">
         <div className="w-8 h-8 border-4 border-[#F47C0B] border-t-transparent rounded-full animate-spin mb-4" />

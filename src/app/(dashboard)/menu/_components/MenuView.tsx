@@ -80,20 +80,16 @@ export const MenuView: React.FC = () => {
     setShowModal(true);
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (editingItem) {
-      updateMenuItem(editingItem.id, formData);
-    } else {
-      addMenuItem(formData);
-    }
+    const ok = editingItem ? await updateMenuItem(editingItem.id, formData) : await addMenuItem(formData);
+    if (!ok) return;
     playChime('success');
     setShowModal(false);
   };
 
-  const handleDelete = (id: string, name: string) => {
-    if (confirm(`Yakin ingin menghapus menu "${name}"?`)) {
-      deleteMenuItem(id);
+  const handleDelete = async (id: string, name: string) => {
+    if (confirm(`Yakin ingin menghapus menu "${name}"?`) && (await deleteMenuItem(id))) {
       playChime('alert');
     }
   };

@@ -1,24 +1,14 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useState, useEffect } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import {
-  MenuItem,
-  Order,
-  StockItem,
-  StoreSettings,
-  CartItem,
-  OrderStatus,
-  OrderType,
-  PaymentMethod,
-} from '@/types';
-import {
-  INITIAL_MENU,
-  INITIAL_ORDERS,
-  INITIAL_STOCKS,
-  INITIAL_STORE_SETTINGS,
-} from '@/app/_data/mockData';
+import { MenuItem, Order, StockItem, StoreSettings, CartItem, OrderStatus, OrderType, PaymentMethod } from '@/types';
 import { playChime } from '@/app/_utils/format';
+import { api, ApiError } from '@/app/_utils/api';
+import { useAuth } from '@/app/_context/AuthContext';
+
+// Menu, orders, stock and settings live in the database (/api/*); this context loads them after
+// login and sends every change to the server. Only the POS cart and UI state stay in the browser.
 
 export type DashboardTab =
   | 'dashboard'
@@ -58,6 +48,22 @@ export interface AppNotification {
   isRead: boolean;
 }
 
+export interface NewOrder {
+  customerName: string;
+  tableNumber?: string;
+  orderType: OrderType;
+  items: CartItem[];
+  discount: number;
+  paymentMethod: PaymentMethod;
+  amountPaid: number;
+  notes?: string;
+}
+
+export type StockItemInput = Pick<
+  StockItem,
+  'name' | 'category' | 'unit' | 'currentStock' | 'minStock' | 'costPerUnit' | 'supplier'
+>;
+
 interface AppContextType {
   // Navigation
   activeTab: DashboardTab;
@@ -65,30 +71,21 @@ interface AppContextType {
   isOpenStore: boolean;
   setIsOpenStore: (open: boolean) => void;
 
-  // Menu
+  // True until the first load after login has finished.
+  isDataLoading: boolean;
+
+  // Menu (writes are owner-only on the server). Each mutation resolves to false when it failed;
+  // the error has then already been shown to the user.
   menuItems: MenuItem[];
-  addMenuItem: (item: Omit<MenuItem, 'id'>) => void;
-  updateMenuItem: (id: string, updates: Partial<MenuItem>) => void;
-  deleteMenuItem: (id: string) => void;
-  toggleMenuAvailability: (id: string) => void;
+  addMenuItem: (item: Omit<MenuItem, 'id'>) => Promise<boolean>;
+  updateMenuItem: (id: string, updates: Partial<MenuItem>) => Promise<boolean>;
+  deleteMenuItem: (id: string) => Promise<boolean>;
+  toggleMenuAvailability: (id: string) => Promise<boolean>;
 
   // Orders
   orders: Order[];
-  createOrder: (orderData: {
-    customerName: string;
-    tableNumber?: string;
-    orderType: OrderType;
-    items: CartItem[];
-    subtotal: number;
-    tax: number;
-    discount: number;
-    total: number;
-    paymentMethod: PaymentMethod;
-    amountPaid: number;
-    notes?: string;
-    cashierName: string;
-  }) => Order;
-  updateOrderStatus: (orderId: string, newStatus: OrderStatus) => void;
+  createOrder: (order: NewOrder) => Promise<Order | null>;
+  updateOrderStatus: (orderId: string, newStatus: OrderStatus) => Promise<boolean>;
 
   // POS Cart
   cart: CartItem[];
@@ -108,12 +105,12 @@ interface AppContextType {
 
   // Stock
   stockItems: StockItem[];
-  restockItem: (id: string, addedStock: number, totalCost: number) => void;
-  updateStockItem: (id: string, updates: Partial<StockItem>) => void;
+  addStockItem: (item: StockItemInput) => Promise<boolean>;
+  updateStockItem: (id: string, updates: Partial<StockItem>) => Promise<boolean>;
 
-  // Settings
+  // Settings (owner-only writes)
   settings: StoreSettings;
-  updateSettings: (newSettings: Partial<StoreSettings>) => void;
+  updateSettings: (newSettings: Partial<StoreSettings>) => Promise<boolean>;
 
   // Receipt Modal
   lastCompletedOrder: Order | null;
@@ -127,9 +124,36 @@ interface AppContextType {
   unreadCount: number;
 }
 
+// Placeholder until /api/settings answers; the dashboard layout waits for that first load.
+const EMPTY_SETTINGS: StoreSettings = {
+  storeName: '',
+  tagline: '',
+  address: '',
+  phone: '',
+  taxRate: 0,
+  serviceChargeRate: 0,
+  receiptHeader: '',
+  receiptFooter: '',
+  wifiPassword: '',
+  openHours: '',
+};
+
+// How often open dashboards pick up orders taken on another device.
+const ORDER_REFRESH_MS = 15_000;
+
+const showError = (err: unknown) => {
+  playChime('alert');
+  alert(err instanceof Error ? err.message : 'Terjadi kesalahan. Coba lagi.');
+};
+
+const replaceById = <T extends { id: string }>(list: T[], item: T): T[] =>
+  list.map((existing) => (existing.id === item.id ? item : existing));
+
 const AppContext = createContext<AppContextType | undefined>(undefined);
 
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+  const { user } = useAuth();
+
   // Every tab is its own route (/pos, /team, ...), so the active tab is read from the URL.
   const router = useRouter();
   const pathname = usePathname();
@@ -140,10 +164,12 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     [router]
   );
   const [isOpenStore, setIsOpenStore] = useState<boolean>(true);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>(INITIAL_MENU);
-  const [orders, setOrders] = useState<Order[]>(INITIAL_ORDERS);
-  const [stockItems, setStockItems] = useState<StockItem[]>(INITIAL_STOCKS);
-  const [settings, setSettings] = useState<StoreSettings>(INITIAL_STORE_SETTINGS);
+
+  const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
+  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  const [orders, setOrders] = useState<Order[]>([]);
+  const [stockItems, setStockItems] = useState<StockItem[]>([]);
+  const [settings, setSettings] = useState<StoreSettings>(EMPTY_SETTINGS);
 
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -156,80 +182,96 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const [lastCompletedOrder, setLastCompletedOrder] = useState<Order | null>(null);
   const [showReceiptModal, setShowReceiptModal] = useState<boolean>(false);
 
-  // Notifications
-  const [notifications, setNotifications] = useState<AppNotification[]>([
-    {
-      id: 'notif-1',
-      title: 'Pesanan Baru Masuk!',
-      message: 'Pesanan WK-20261006-004 (Meja 02) menunggu disiapkan.',
-      time: '10 menit yang lalu',
-      type: 'order',
-      isRead: false,
-    },
-    {
-      id: 'notif-2',
-      title: 'Peringatan Stok Menipis',
-      message: 'Stok Ikan Tenggiri Giling sisa 3.2 Kg (di bawah batas 5 Kg).',
-      time: '1 jam yang lalu',
-      type: 'stock',
-      isRead: false,
-    },
-  ]);
+  // Notifications (kept in the browser for this session)
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-  // Load saved data from localStorage if present
+  // Load everything once per login; reset when the user logs out or switches account.
+  const loginId = user?.loginId;
   useEffect(() => {
-    const savedMenu = localStorage.getItem('wongkito_menu');
-    if (savedMenu) {
-      try {
-        setMenuItems(JSON.parse(savedMenu));
-      } catch {
-        // ignore
-      }
-    }
-    const savedOrders = localStorage.getItem('wongkito_orders');
-    if (savedOrders) {
-      try {
-        setOrders(JSON.parse(savedOrders));
-      } catch {
-        // ignore
-      }
-    }
-  }, []);
+    if (!loginId) return;
+    let cancelled = false;
 
-  // Save changes
-  useEffect(() => {
-    localStorage.setItem('wongkito_menu', JSON.stringify(menuItems));
-  }, [menuItems]);
+    Promise.all([
+      api<{ menu: MenuItem[] }>('/api/menu'),
+      api<{ orders: Order[] }>('/api/orders'),
+      api<{ stock: StockItem[] }>('/api/stock'),
+      api<{ settings: StoreSettings }>('/api/settings'),
+    ])
+      .then(([menuRes, ordersRes, stockRes, settingsRes]) => {
+        if (cancelled) return;
+        setMenuItems(menuRes.menu);
+        setOrders(ordersRes.orders);
+        setStockItems(stockRes.stock);
+        setSettings(settingsRes.settings);
+      })
+      .catch((err) => {
+        if (!cancelled && !(err instanceof ApiError && err.status === 401)) showError(err);
+      })
+      .finally(() => {
+        if (!cancelled) setIsDataLoading(false);
+      });
 
-  useEffect(() => {
-    localStorage.setItem('wongkito_orders', JSON.stringify(orders));
-  }, [orders]);
+    const refresh = setInterval(() => {
+      if (document.visibilityState !== 'visible') return;
+      api<{ orders: Order[] }>('/api/orders')
+        .then((res) => {
+          if (!cancelled) setOrders(res.orders);
+        })
+        .catch(() => {
+          // Background refresh; the next user action will surface any real problem.
+        });
+    }, ORDER_REFRESH_MS);
+
+    return () => {
+      cancelled = true;
+      clearInterval(refresh);
+      setIsDataLoading(true);
+      setMenuItems([]);
+      setOrders([]);
+      setStockItems([]);
+      setCart([]);
+      setNotifications([]);
+    };
+  }, [loginId]);
 
   // Menu Methods
-  const addMenuItem = (item: Omit<MenuItem, 'id'>) => {
-    const newItem: MenuItem = {
-      ...item,
-      id: 'm-' + Date.now(),
-    };
-    setMenuItems((prev) => [newItem, ...prev]);
+  const saveMenuItem = async (id: string | null, item: Omit<MenuItem, 'id'>): Promise<boolean> => {
+    try {
+      const { item: saved } = await api<{ item: MenuItem }>(id ? `/api/menu/${encodeURIComponent(id)}` : '/api/menu', {
+        method: id ? 'PUT' : 'POST',
+        body: item,
+      });
+      setMenuItems((prev) => (id ? replaceById(prev, saved) : [...prev, saved]));
+      return true;
+    } catch (err) {
+      showError(err);
+      return false;
+    }
   };
 
-  const updateMenuItem = (id: string, updates: Partial<MenuItem>) => {
-    setMenuItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
-    );
+  const addMenuItem = (item: Omit<MenuItem, 'id'>) => saveMenuItem(null, item);
+
+  const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
+    const current = menuItems.find((m) => m.id === id);
+    if (!current) return false;
+    const { id: _id, ...rest } = { ...current, ...updates };
+    return saveMenuItem(id, rest);
   };
 
-  const deleteMenuItem = (id: string) => {
-    setMenuItems((prev) => prev.filter((item) => item.id !== id));
+  const deleteMenuItem = async (id: string) => {
+    try {
+      await api(`/api/menu/${encodeURIComponent(id)}`, { method: 'DELETE' });
+      setMenuItems((prev) => prev.filter((item) => item.id !== id));
+      return true;
+    } catch (err) {
+      showError(err);
+      return false;
+    }
   };
 
   const toggleMenuAvailability = (id: string) => {
-    setMenuItems((prev) =>
-      prev.map((item) =>
-        item.id === id ? { ...item, isAvailable: !item.isAvailable } : item
-      )
-    );
+    const current = menuItems.find((m) => m.id === id);
+    return current ? updateMenuItem(id, { isAvailable: !current.isAvailable }) : Promise.resolve(false);
   };
 
   // Cart Methods
@@ -277,98 +319,116 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     setCartDiscount(0);
   };
 
-  // Orders Methods
-  const createOrder = (orderData: {
-    customerName: string;
-    tableNumber?: string;
-    orderType: OrderType;
-    items: CartItem[];
-    subtotal: number;
-    tax: number;
-    discount: number;
-    total: number;
-    paymentMethod: PaymentMethod;
-    amountPaid: number;
-    notes?: string;
-    cashierName: string;
-  }): Order => {
-    const orderCount = orders.length + 1;
-    const padCount = String(orderCount).padStart(3, '0');
-    const orderNumber = `WK-${new Date().toISOString().slice(0, 10).replace(/-/g, '')}-${padCount}`;
-
-    const change = Math.max(0, orderData.amountPaid - orderData.total);
-
-    const newOrder: Order = {
-      id: 'ord-' + Date.now(),
-      orderNumber,
-      customerName: orderData.customerName || 'Pelanggan',
-      tableNumber: orderData.orderType === 'dine_in' ? orderData.tableNumber : undefined,
-      orderType: orderData.orderType,
-      items: orderData.items,
-      subtotal: orderData.subtotal,
-      tax: orderData.tax,
-      discount: orderData.discount,
-      total: orderData.total,
-      paymentMethod: orderData.paymentMethod,
-      paymentStatus: 'paid',
-      amountPaid: orderData.amountPaid,
-      change,
-      status: 'pending',
-      createdAt: new Date().toISOString(),
-      cashierName: orderData.cashierName,
-      notes: orderData.notes,
-    };
+  // Orders Methods. The server recalculates prices, tax and change and takes the portions off stock.
+  const createOrder = async (order: NewOrder): Promise<Order | null> => {
+    let newOrder: Order;
+    try {
+      ({ order: newOrder } = await api<{ order: Order }>('/api/orders', {
+        method: 'POST',
+        body: {
+          customerName: order.customerName,
+          tableNumber: order.tableNumber,
+          orderType: order.orderType,
+          items: order.items.map((ci) => ({ menuItemId: ci.menuItem.id, quantity: ci.quantity, notes: ci.notes ?? '' })),
+          discount: order.discount,
+          paymentMethod: order.paymentMethod,
+          amountPaid: order.amountPaid,
+          notes: order.notes ?? '',
+        },
+      }));
+    } catch (err) {
+      showError(err);
+      return null;
+    }
 
     setOrders((prev) => [newOrder, ...prev]);
+    // Sold portions changed on the server; take the fresh numbers for the menu grid.
+    setMenuItems((prev) =>
+      prev.map((m) => {
+        const sold = newOrder.items.find((ci) => ci.menuItem.id === m.id);
+        return sold ? { ...m, stock: sold.menuItem.stock } : m;
+      })
+    );
     setLastCompletedOrder(newOrder);
     setShowReceiptModal(true);
     clearCart();
 
-    // Add notification
-    const newNotif: AppNotification = {
-      id: 'notif-' + Date.now(),
-      title: 'Transaksi Sukses!',
-      message: `${orderNumber} • ${newOrder.customerName} (${newOrder.items.length} item)`,
-      time: 'Baru saja',
-      type: 'order',
-      isRead: false,
-    };
-    setNotifications((prev) => [newNotif, ...prev]);
+    setNotifications((prev) => [
+      {
+        id: 'notif-' + newOrder.id,
+        title: 'Transaksi Sukses!',
+        message: `${newOrder.orderNumber} • ${newOrder.customerName} (${newOrder.items.length} item)`,
+        time: 'Baru saja',
+        type: 'order',
+        isRead: false,
+      },
+      ...prev,
+    ]);
 
     return newOrder;
   };
 
-  const updateOrderStatus = (orderId: string, newStatus: OrderStatus) => {
-    playChime('click');
-    setOrders((prev) =>
-      prev.map((ord) => (ord.id === orderId ? { ...ord, status: newStatus } : ord))
-    );
+  const updateOrderStatus = async (orderId: string, newStatus: OrderStatus) => {
+    try {
+      const { order } = await api<{ order: Order }>(`/api/orders/${encodeURIComponent(orderId)}`, {
+        method: 'PATCH',
+        body: { status: newStatus },
+      });
+      setOrders((prev) => replaceById(prev, order));
+      if (newStatus === 'cancelled') {
+        // Cancelling returned the portions to the menu stock.
+        api<{ menu: MenuItem[] }>('/api/menu')
+          .then((res) => setMenuItems(res.menu))
+          .catch(() => {});
+      }
+      return true;
+    } catch (err) {
+      showError(err);
+      return false;
+    }
   };
 
   // Stock Methods
-  const restockItem = (id: string, addedStock: number, _totalCost: number) => {
-    setStockItems((prev) =>
-      prev.map((item) =>
-        item.id === id
-          ? {
-              ...item,
-              currentStock: item.currentStock + addedStock,
-              lastRestocked: new Date().toISOString().slice(0, 10),
-            }
-          : item
-      )
-    );
+  const addStockItem = async (item: StockItemInput) => {
+    try {
+      const { item: saved } = await api<{ item: StockItem }>('/api/stock', { method: 'POST', body: item });
+      setStockItems((prev) => [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
+      return true;
+    } catch (err) {
+      showError(err);
+      return false;
+    }
   };
 
-  const updateStockItem = (id: string, updates: Partial<StockItem>) => {
-    setStockItems((prev) =>
-      prev.map((item) => (item.id === id ? { ...item, ...updates } : item))
-    );
+  const updateStockItem = async (id: string, updates: Partial<StockItem>) => {
+    const current = stockItems.find((s) => s.id === id);
+    if (!current) return false;
+    try {
+      const { item: saved } = await api<{ item: StockItem }>(`/api/stock/${encodeURIComponent(id)}`, {
+        method: 'PUT',
+        body: { ...current, ...updates },
+      });
+      setStockItems((prev) => replaceById(prev, saved));
+      return true;
+    } catch (err) {
+      showError(err);
+      return false;
+    }
   };
 
   // Settings
-  const updateSettings = (newSettings: Partial<StoreSettings>) => {
-    setSettings((prev) => ({ ...prev, ...newSettings }));
+  const updateSettings = async (newSettings: Partial<StoreSettings>) => {
+    try {
+      const { settings: saved } = await api<{ settings: StoreSettings }>('/api/settings', {
+        method: 'PUT',
+        body: { ...settings, ...newSettings },
+      });
+      setSettings(saved);
+      return true;
+    } catch (err) {
+      showError(err);
+      return false;
+    }
   };
 
   const markAllNotificationsAsRead = () => {
@@ -384,6 +444,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         setActiveTab,
         isOpenStore,
         setIsOpenStore,
+        isDataLoading,
         menuItems,
         addMenuItem,
         updateMenuItem,
@@ -407,7 +468,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         cartDiscount,
         setCartDiscount,
         stockItems,
-        restockItem,
+        addStockItem,
         updateStockItem,
         settings,
         updateSettings,

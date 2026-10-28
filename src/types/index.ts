@@ -42,7 +42,7 @@ export interface CartItem {
   notes?: string;
 }
 
-export type OrderStatus = 'pending' | 'processing' | 'ready' | 'completed' | 'cancelled';
+export type OrderStatus = 'pending' | 'accepted' | 'processing' | 'ready' | 'completed' | 'cancelled';
 export type OrderType = 'dine_in' | 'takeaway' | 'delivery';
 export type PaymentMethod = 'cash' | 'qris' | 'transfer' | 'debit';
 
