@@ -1,8 +1,8 @@
 import type { Metadata } from 'next';
 import { Inter, Outfit } from 'next/font/google';
 import './globals.css';
-import { AuthProvider } from '@/context/AuthContext';
-import { AppProvider } from '@/context/AppContext';
+import { AuthProvider } from '@/app/_context/AuthContext';
+import { AppProvider } from '@/app/_context/AppContext';
 
 const inter = Inter({
   variable: '--font-inter',

@@ -1,10 +1,24 @@
+export type UserRole = 'superadmin' | 'kasir';
+
+// The logged-in user as seen by the UI. `role` is always derived from `loginId`.
 export interface User {
-  id: string;
+  loginId: string;
   name: string;
-  email: string;
-  role: 'superadmin' | 'kasir';
+  role: UserRole;
   avatar?: string;
   shift?: string;
+}
+
+export type AccountStatus = 'Aktif' | 'Nonaktif';
+
+// A staff account created by the owner, as returned by the API (never includes the password hash).
+export interface StaffAccount {
+  loginId: string;
+  name: string;
+  phone: string;
+  shift: string;
+  status: AccountStatus;
+  avatar?: string;
 }
 
 export type MenuCategory = 'all' | 'kopi' | 'non-kopi' | 'makanan' | 'cemilan' | 'signature';
@@ -87,16 +101,6 @@ export interface AttendanceRecord {
   checkOutTime?: string;
   status: 'Hadir' | 'Izin' | 'Sakit' | 'Terlambat';
   avatar?: string;
-}
-
-export interface CashierTeamMember {
-  id: string;
-  initials: string;
-  name: string;
-  phone: string;
-  shift: string;
-  username: string;
-  status: 'Aktif' | 'Nonaktif';
 }
 
 

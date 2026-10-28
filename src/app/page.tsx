@@ -1,26 +1,35 @@
 'use client';
 
-import React from 'react';
-import { useAuth } from '@/context/AuthContext';
-import { useApp } from '@/context/AppContext';
-import { LoginPage } from '@/components/auth/LoginPage';
-import { DashboardLayout } from '@/components/layout/DashboardLayout';
-import { OwnerDashboardView } from '@/components/dashboard/OwnerDashboardView';
-import { PosView } from '@/components/pos/PosView';
-import { OrdersView } from '@/components/orders/OrdersView';
-import { MenuView } from '@/components/menu/MenuView';
-import { InventoryView } from '@/components/inventory/InventoryView';
-import { ReportsView } from '@/components/reports/ReportsView';
-import { AttendanceView } from '@/components/attendance/AttendanceView';
-import { TeamView } from '@/components/team/TeamView';
-import { ProfileView } from '@/components/profile/ProfileView';
-import { SettingsView } from '@/components/settings/SettingsView';
-import { NotificationsView } from '@/components/notifications/NotificationsView';
-import { ReceiptModal } from '@/components/common/ReceiptModal';
+import React, { useEffect } from 'react';
+import { useAuth } from '@/app/_context/AuthContext';
+import { useApp } from '@/app/_context/AppContext';
+import { LoginPage } from '@/app/_components/auth/LoginPage';
+import { DashboardLayout } from '@/app/_components/layout/DashboardLayout';
+import { OwnerDashboardView } from '@/app/_components/dashboard/OwnerDashboardView';
+import { PosView } from '@/app/_components/pos/PosView';
+import { OrdersView } from '@/app/_components/orders/OrdersView';
+import { MenuView } from '@/app/_components/menu/MenuView';
+import { InventoryView } from '@/app/_components/inventory/InventoryView';
+import { ReportsView } from '@/app/_components/reports/ReportsView';
+import { AttendanceView } from '@/app/_components/attendance/AttendanceView';
+import { TeamView } from '@/app/_components/team/TeamView';
+import { ProfileView } from '@/app/_components/profile/ProfileView';
+import { SettingsView } from '@/app/_components/settings/SettingsView';
+import { NotificationsView } from '@/app/_components/notifications/NotificationsView';
+import { ReceiptModal } from '@/app/_components/common/ReceiptModal';
+import { canAccessTab } from '@/lib/access';
 
 export default function Home() {
   const { isAuthenticated, isLoading, user } = useAuth();
-  const { activeTab } = useApp();
+  const { activeTab, setActiveTab } = useApp();
+
+  const isTabAllowed = canAccessTab(user?.role, activeTab);
+
+  // Send the user back to the dashboard when the current tab is not allowed for their role
+  // (e.g. a kasir logging in right after the owner was on Team).
+  useEffect(() => {
+    if (user && !isTabAllowed) setActiveTab('dashboard');
+  }, [user, isTabAllowed, setActiveTab]);
 
   if (isLoading) {
     return (
@@ -37,9 +46,9 @@ export default function Home() {
     return <LoginPage />;
   }
 
-  const isOwner = user?.role === 'superadmin';
-
   const renderActiveView = () => {
+    if (!isTabAllowed) return <OwnerDashboardView />;
+
     switch (activeTab) {
       case 'dashboard':
       case 'overview':
