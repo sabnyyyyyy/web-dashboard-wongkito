@@ -48,11 +48,11 @@ dashboard-wongkito/
 │   │   │   ├── AppContext.tsx  # State bisnis (menu, pesanan, keranjang POS, stok, setting)
 │   │   │   └── AuthContext.tsx # State autentikasi sesi pengguna (Owner / Kasir)
 │   │   ├── _data/
-│   │   │   └── mockData.ts     # Data awal (katalog menu, pesanan awal, stok)
+│   │   │   └── mockData.ts     # Data contoh grafik di OverviewView
 │   │   └── _utils/
 │   │       └── format.ts       # Format mata uang Rupiah, waktu lokal, dan Web Audio chime
 │   ├── lib/                    # Helper bersama client & server (akses role, aturan password)
-│   ├── server/                 # Logika backend (database, sesi, rate limit, hashing)
+│   ├── server/                 # Logika backend (database, sesi, rate limit, hashing, data seed)
 │   └── types/
 │       └── index.ts            # Kontrak tipe dan interface TypeScript
 ├── package.json
@@ -70,7 +70,7 @@ flowchart TD
     AuthCtx -->|Sudah Login| Layout[DashboardLayout.tsx]
     
     Layout --> AppCtx[AppContext.tsx\nGlobal State]
-    AppCtx <--> LocalStorage[(Local Storage)]
+    AppCtx <--> API[(Next API + PostgreSQL)]
     
     Layout --> Views{Navigasi Berdasarkan URL}
     Views -->|dashboard| OwnerView[OwnerDashboardView.tsx\nKPI & Ringkasan Operasional]
@@ -104,40 +104,57 @@ flowchart TD
 ## 🧩 Analisis Modul & Fungsi-Fungsi Kunci
 
 ### 1. Global State Management (`src/app/_context/AppContext.tsx`)
-Menangani logika operasional utama:
-* `addToCart(item, notes)`: Memasukkan item menu ke keranjang belanja POS, memperbarui kuantitas jika sudah ada, serta memicu efek suara klik (`playChime`).
-* `updateCartQuantity(itemId, delta)`: Menambah atau mengurangi kuantitas item dalam keranjang (otomatis menghapus jika kuantitas mencapai 0).
-* `createOrder(orderData)`: Membuat data pesanan baru dengan nomor nota otomatis (format: `WK-YYYYMMDD-XXX`), memotong stok bahan baku terkait, dan menetapkan `lastCompletedOrder`.
-* `updateOrderStatus(orderId, newStatus)`: Mengubah alur status pesanan (`pending` $\rightarrow$ `processing` $\rightarrow$ `ready` $\rightarrow$ `completed` $\rightarrow$ `cancelled`).
-* `restockItem(id, addedStock, totalCost)`: Menambahkan jumlah stok fisik inventaris dan memperbarui riwayat tanggal restock.
-* `toggleMenuAvailability(id)`: Mengaktifkan atau menonaktifkan status ketersediaan item menu secara langsung.
+Menu, pesanan, stok, dan pengaturan toko dimuat dari API setelah login. Setiap perubahan dikirim ke server; keranjang POS tetap di browser. Pesanan dimuat ulang otomatis tiap 15 detik supaya kasir dan dapur di perangkat lain melihat pesanan yang sama.
+* `addToCart(item, notes)` / `updateCartQuantity(itemId, delta)`: Mengelola keranjang POS (lokal).
+* `createOrder(order)`: Mengirim keranjang ke `POST /api/orders`. Server menghitung ulang harga, pajak, dan kembalian, membuat nomor nota `WK-YYYYMMDD-XXX`, dan mengurangi stok porsi menu.
+* `updateOrderStatus(orderId, status)`: `pending` → `accepted` → `processing` → `ready` → `completed`, atau `cancelled` (stok porsi dikembalikan).
+* `addMenuItem` / `updateMenuItem` / `deleteMenuItem` / `toggleMenuAvailability`: CRUD menu (khusus Owner).
+* `addStockItem` / `updateStockItem`: Kelola bahan baku (Owner & Kasir).
+* `updateSettings`: Simpan pengaturan toko & nota (khusus Owner).
+* Semua fungsi yang mengubah data mengembalikan `false` jika gagal, dan pesan error dari server sudah ditampilkan.
 
 ### 2. Autentikasi Pengguna (`src/app/_context/AuthContext.tsx`)
-* `login(email, password, rememberMe)`: Memvalidasi kredensial pengguna dan menginisialisasi sesi.
-* `demoLogin(role)`: Fasilitas login cepat 1-klik untuk testing mode Owner (`superadmin`) atau Kasir (`kasir`).
-* `logout()`: Menghapus sesi aktif dari state dan penyimpanan lokal.
+* `login(loginId, password, rememberMe)`: Login dengan ID login (`OWN-001`, `KSR-001`, ...). Role ditentukan dari prefix ID.
+* `logout()`: Mengakhiri sesi di server.
+* `createKasirAccount` / `updateKasirAccount` / `resetKasirPassword`: Manajemen akun kasir oleh Owner.
 
-### 3. Komponen Nota Kasir (`src/app/_components/common/ReceiptModal.tsx`)
+### 3. Backend (`src/app/api/*`, `src/server/*`)
+| Endpoint | Akses | Fungsi |
+| --- | --- | --- |
+| `/api/auth/*` | publik / login | Login, logout, sesi aktif, ganti password & nama |
+| `/api/accounts/*` | Owner | Buat, ubah, reset password akun kasir |
+| `GET /api/menu`, `POST`, `PUT/DELETE /api/menu/[id]` | baca: login, ubah: Owner | Katalog menu |
+| `GET/POST /api/stock`, `PUT /api/stock/[id]` | login | Bahan baku |
+| `GET/POST /api/orders`, `PATCH /api/orders/[id]` | login | Transaksi POS & alur dapur |
+| `GET/PUT /api/settings` | baca: login, ubah: Owner | Pengaturan toko |
+
+Skema tabel ada di `src/server/schema.sql`; data awal (menu, stok, pengaturan) ada di `src/server/seed-data.ts` dan hanya dimasukkan ke tabel yang masih kosong.
+
+### 4. Komponen Nota Kasir (`src/app/_components/common/ReceiptModal.tsx`)
 * Menampilkan antarmuka struk bergaya printer thermal 58mm/80mm (`#thermal-receipt`).
 * Memuat rincian toko (nama, alamat, no. telepon dari `settings`), detail nomor nota, kasir bertugas, meja/tipe pesanan, rincian menu beserta catatan, subtotal, diskon, pajak, nominal tunai, dan kembalian.
 * Fungsi `handlePrint()` memanggil `window.print()` yang dipadukan dengan style `@media print` sehingga yang tercetak di kertas hanyalah kertas struk tanpa elemen dashboard lainnya.
 
-### 4. Format & Web Audio Helper (`src/app/_utils/format.ts`)
+### 5. Format & Web Audio Helper (`src/app/_utils/format.ts`)
 * `formatRupiah(amount)`: Memformat angka ke format standar mata uang Rupiah Indonesia (contoh: `Rp 18.000`).
 * `formatDateTime(dateString)` & `formatTimeOnly(dateString)`: Mengonversi format ISO ke format penanggalan lokal Indonesia (`id-ID`).
 * `playChime(type)`: Memanfaatkan Web Audio API peramban untuk menghasilkan efek bunyi audio synthesizer tanpa membutuhkan file `.mp3` eksternal (`success`, `alert`, `click`).
 
-### 5. Kontrak Tipe Data (`src/types/index.ts`)
+### 6. Kontrak Tipe Data (`src/types/index.ts`)
 Mendefinisikan entitas data utama:
 * `User`: Informasi pengguna dan hak akses (`superadmin` | `kasir`).
-* `MenuItem`: Data produk katalog, kategori, harga jual, HPP (*cost price*), dan stok.
+* `MenuItem`: Data produk katalog, kategori, harga jual, HPP (*cost price*), dan stok porsi.
 * `Order`: Data lengkap transaksi penjualan, metode bayar, kasir, dan status pesanan.
 * `StockItem`: Data kontrol stok bahan baku beserta batas minimum peringatan (*minStock*).
 * `StoreSettings`: Konfigurasi toko, tarif PB1, alamat, jam buka, dan footer struk.
 
+> Halaman **Absensi** dan **Notifikasi** masih memakai data contoh di komponennya dan belum tersambung ke database.
+
 ---
 
 ## 🛠️ Cara Menjalankan Proyek Secara Lokal
+
+Butuh Node.js dan PostgreSQL (versi 13 ke atas).
 
 1. **Clone repositori dan pasang dependensi:**
    ```bash
@@ -146,15 +163,31 @@ Mendefinisikan entitas data utama:
    npm install
    ```
 
-2. **Jalankan server pengembangan:**
+2. **Siapkan database.** Salin `.env.example` menjadi `.env.local`, lalu isi `DATABASE_URL`. Ada dua pilihan:
+   * **Pakai PostgreSQL yang sudah ter-install:** buat database `wongkito` (misalnya `createdb -U postgres wongkito`), lalu isi
+     `DATABASE_URL=postgres://postgres:PASSWORD@localhost:5432/wongkito`.
+   * **Tanpa password postgres (server khusus proyek di folder `.pgdata`, port 5433):** pakai program dari folder `bin` PostgreSQL,
+     contoh di Windows: `C:\Program Files\PostgreSQL\18\bin\`.
+     ```bash
+     initdb -D .pgdata -U wongkito --auth=scram-sha-256 --pwprompt -E UTF8 --locale=C
+     pg_ctl -D .pgdata -o "-p 5433" -l .pgdata/server.log start
+     createdb -h localhost -p 5433 -U wongkito wongkito
+     ```
+     Lalu isi `DATABASE_URL=postgres://wongkito:PASSWORD_TADI@localhost:5433/wongkito`.
+     Setelah komputer restart, jalankan lagi baris `pg_ctl ... start`.
+
+3. **Buat tabel, data awal, dan akun Owner:**
+   ```bash
+   npm run db:setup
+   ```
+   ID login `OWN-001` dan password sementaranya ditampilkan sekali. Lupa password Owner? Jalankan `npm run db:reset-owner`.
+
+4. **Jalankan server pengembangan** lalu buka [http://localhost:3000](http://localhost:3000):
    ```bash
    npm run dev
    ```
 
-3. **Buka di peramban:**
-   Akses [http://localhost:3000](http://localhost:3000)
-
-4. **Build untuk produksi:**
+5. **Build untuk produksi:**
    ```bash
    npm run build
    npm run start
@@ -162,8 +195,7 @@ Mendefinisikan entitas data utama:
 
 ---
 
-## 🔑 Kredensial Pengujian (Demo Login)
+## 🔑 Akun & Login
 
-Aplikasi menyediakan tombol cepat **Demo Login** di halaman login:
-* **Owner / Superadmin:** `warkopwongkito@gmail.com` (password: `admin123` atau sembarang min 4 karakter)
-* **Kasir:** Tersedia tombol *Demo Kasir* langsung pada halaman login.
+* **Owner:** `OWN-001`, password dari `npm run db:setup` (ganti lewat menu Profile setelah login).
+* **Kasir:** dibuat oleh Owner di menu **Team** (ID `KSR-001`, `KSR-002`, ...), lengkap dengan password awalnya.
