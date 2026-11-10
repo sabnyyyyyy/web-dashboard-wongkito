@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { playChime } from '@/app/_utils/format';
 import { useApp } from '@/app/_context/AppContext';
+import { useAuth } from '@/app/_context/AuthContext';
 import { StockItem } from '@/types';
 import {
   Package,
@@ -54,6 +55,9 @@ const EMPTY_FORM = {
 
 export const InventoryView: React.FC = () => {
   const { stockItems, addStockItem, updateStockItem } = useApp();
+  const { user } = useAuth();
+  // Kasir only sees the stock; adding, editing and reducing it is the owner's job (the server enforces it too).
+  const canEditStock = user?.role === 'superadmin';
   const stockList = stockItems.map(toStockRow);
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState('');
@@ -71,6 +75,7 @@ export const InventoryView: React.FC = () => {
     const itemToEdit = localStorage.getItem('open_update_stock_item');
     if (itemToEdit) {
       localStorage.removeItem('open_update_stock_item');
+      if (!canEditStock) return;
       const found = stockItems.map(toStockRow).find((s) => s.name.toLowerCase().includes(itemToEdit.toLowerCase()));
       if (found) {
         setSelectedItemToEdit(found);
@@ -83,7 +88,7 @@ export const InventoryView: React.FC = () => {
       }
       setIsUpdateFormOpen(true);
     }
-  }, [stockItems]);
+  }, [stockItems, canEditStock]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -92,6 +97,7 @@ export const InventoryView: React.FC = () => {
 
   // With an item: edit it. Without: blank form for a new item.
   const handleOpenUpdateForm = (item?: StockRow) => {
+    if (!canEditStock) return;
     if (item) {
       setSelectedItemToEdit(item);
       setFormData({
@@ -146,7 +152,7 @@ export const InventoryView: React.FC = () => {
   const habisCount = stockList.filter((s) => s.status === 'HABIS').length;
 
   // RENDER UPDATE STOK FORM (Matching user screenshot)
-  if (isUpdateFormOpen) {
+  if (isUpdateFormOpen && canEditStock) {
     return (
       <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in">
         {/* Header matching screenshot */}
@@ -285,13 +291,19 @@ export const InventoryView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => handleOpenUpdateForm()}
-          className="px-4 py-2.5 bg-[#F47C0B] hover:bg-[#EA580C] text-white font-bold text-xs rounded-[8px] shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 uppercase tracking-wider"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ UPDATE STOK</span>
-        </button>
+        {canEditStock ? (
+          <button
+            onClick={() => handleOpenUpdateForm()}
+            className="px-4 py-2.5 bg-[#F47C0B] hover:bg-[#EA580C] text-white font-bold text-xs rounded-[8px] shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 uppercase tracking-wider"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ UPDATE STOK</span>
+          </button>
+        ) : (
+          <span className="px-3 py-2 bg-[#F1F1EF] text-[#525252] font-semibold text-[11px] rounded-[8px] shrink-0">
+            Hanya lihat · perubahan stok dilakukan Owner
+          </span>
+        )}
       </div>
 
       {toastMessage && (
@@ -392,7 +404,7 @@ export const InventoryView: React.FC = () => {
                 <th className="py-3 px-4">SATUAN</th>
                 <th className="py-3 px-4">BATAS MINIMUM</th>
                 <th className="py-3 px-4 text-center">STATUS</th>
-                <th className="py-3 px-4 text-center">AKSI</th>
+                {canEditStock && <th className="py-3 px-4 text-center">AKSI</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E7EB]">
@@ -451,23 +463,25 @@ export const InventoryView: React.FC = () => {
                   </td>
 
                   {/* AKSI */}
-                  <td className="py-3.5 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => handleOpenUpdateForm(row)}
-                        className="px-3 py-1 bg-white hover:bg-[#F1F1EF] border border-[#D1D5DB] text-[#525252] hover:text-[#242424] font-bold text-xs rounded-[6px] transition-colors cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleOpenUpdateForm(row)}
-                        className="px-2.5 py-1 bg-[#242424] hover:bg-black text-white font-bold text-xs rounded-[6px] transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Stok</span>
-                      </button>
-                    </div>
-                  </td>
+                  {canEditStock && (
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenUpdateForm(row)}
+                          className="px-3 py-1 bg-white hover:bg-[#F1F1EF] border border-[#D1D5DB] text-[#525252] hover:text-[#242424] font-bold text-xs rounded-[6px] transition-colors cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleOpenUpdateForm(row)}
+                          className="px-2.5 py-1 bg-[#242424] hover:bg-black text-white font-bold text-xs rounded-[6px] transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Stok</span>
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

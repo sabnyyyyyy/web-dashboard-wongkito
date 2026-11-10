@@ -163,7 +163,7 @@ export const OwnerDashboardView: React.FC = () => {
           onClick={() => setActiveTab('inventory')}
           className="px-4 py-2 bg-white hover:bg-[#F1F1EF] text-[#525252] hover:text-[#242424] font-bold border border-[#F1F1EF] rounded-[8px] transition-all cursor-pointer"
         >
-          Update Stok
+          {user?.role === 'superadmin' ? 'Update Stok' : 'Lihat Stok'}
         </button>
 
         <button
@@ -270,7 +270,7 @@ export const OwnerDashboardView: React.FC = () => {
                 onClick={() => setActiveTab('inventory')}
                 className="px-3 py-1 bg-white hover:bg-[#F1F1EF] border border-[#F1F1EF] text-[#525252] hover:text-[#242424] text-xs font-bold rounded-[8px] transition-all cursor-pointer"
               >
-                Kelola Stok
+                {user?.role === 'superadmin' ? 'Kelola Stok' : 'Lihat Stok'}
               </button>
             </div>
 

@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/app/_context/AppContext';
+import { useAuth } from '@/app/_context/AuthContext';
 import { formatDateTime, formatRupiah, playChime } from '@/app/_utils/format';
 import { MenuItem, Order, OrderStatus } from '@/types';
 import {
@@ -115,6 +116,8 @@ const toCustomOrder = (order: Order): CustomOrder => {
 
 export const OrdersView: React.FC = () => {
   const { orders, updateOrderStatus, setActiveTab, setLastCompletedOrder, setShowReceiptModal } = useApp();
+  const { user } = useAuth();
+  const canCancel = user?.role === 'superadmin';
 
   const orderList = orders.map(toCustomOrder);
 
@@ -441,8 +444,8 @@ export const OrdersView: React.FC = () => {
                 Cetak Struk
               </button>
 
-              {/* Action 3: Batalkan Pesanan */}
-              {selectedOrder.status !== 'SELESAI' && selectedOrder.status !== 'BATAL' && (
+              {/* Action 3: Batalkan Pesanan (owner only; the server rejects it for kasir too) */}
+              {canCancel && selectedOrder.status !== 'SELESAI' && selectedOrder.status !== 'BATAL' && (
                 <div className="text-center pt-1">
                   <button
                     onClick={() => handleCancelOrder(selectedOrder.id)}

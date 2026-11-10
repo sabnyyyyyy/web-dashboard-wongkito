@@ -4,7 +4,8 @@ import React, { useState } from 'react';
 import { useAuth } from '@/app/_context/AuthContext';
 import { playChime } from '@/app/_utils/format';
 import { ROLE_LABEL } from '@/lib/access';
-import { MIN_PASSWORD_LENGTH } from '@/lib/password';
+import { MIN_PASSWORD_LENGTH, validateNewPassword } from '@/lib/password';
+import { PasswordChecklist } from '@/app/_components/common/PasswordChecklist';
 import { Save, CheckCircle2, KeyRound, AlertTriangle } from 'lucide-react';
 
 const EMPTY_PASSWORD_FORM = { current: '', next: '', confirm: '' };
@@ -37,6 +38,11 @@ export const ProfileView: React.FC = () => {
     e.preventDefault();
     setPasswordError('');
     setPasswordSaved(false);
+    const invalid = validateNewPassword(passwordForm.next);
+    if (invalid) {
+      setPasswordError(invalid);
+      return;
+    }
     if (passwordForm.next !== passwordForm.confirm) {
       setPasswordError('Konfirmasi password baru tidak sama.');
       return;
@@ -189,6 +195,7 @@ export const ProfileView: React.FC = () => {
                 onChange={(e) => setPasswordForm({ ...passwordForm, next: e.target.value })}
                 className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#F95700]"
               />
+              <PasswordChecklist password={passwordForm.next} />
             </div>
             <div>
               <label htmlFor="confirm-password" className="block font-bold text-stone-700 mb-1">Ulangi Password Baru</label>

@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { useApp } from '@/app/_context/AppContext';
 import { playChime } from '@/app/_utils/format';
+import { sanitizePhoneInput, validatePhone } from '@/lib/phone';
 import {
   Store,
   Printer,
@@ -23,6 +24,12 @@ export const SettingsView: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    const invalidPhone = validatePhone(formState.phone);
+    if (invalidPhone) {
+      playChime('alert');
+      alert(invalidPhone);
+      return;
+    }
     if (!(await updateSettings(formState))) return;
     playChime('success');
     setSavedSuccess(true);
@@ -85,9 +92,10 @@ export const SettingsView: React.FC = () => {
             <div>
               <label className="block font-bold text-stone-700 mb-1">No. Kontak / WhatsApp Kasir</label>
               <input
-                type="text"
+                type="tel"
+                inputMode="tel"
                 value={formState.phone}
-                onChange={(e) => setFormState({ ...formState, phone: e.target.value })}
+                onChange={(e) => setFormState({ ...formState, phone: sanitizePhoneInput(e.target.value) })}
                 className="w-full px-3.5 py-2.5 bg-stone-50 border border-stone-200 rounded-xl focus:outline-none focus:border-[#F95700]"
               />
             </div>
