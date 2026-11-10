@@ -1,13 +1,13 @@
 import 'server-only';
 import { StoreSettings } from '@/types';
 import { query } from './db';
-import { HttpError, requireNumber, requireString } from './http';
+import { HttpError, requireNumber, requirePhone, requireString } from './http';
 
 export const parseSettings = (body: Record<string, unknown>): StoreSettings => ({
   storeName: requireString(body.storeName, 'Nama toko', { min: 1, max: 100 }),
   tagline: requireString(body.tagline ?? '', 'Tagline', { max: 200 }),
   address: requireString(body.address ?? '', 'Alamat', { max: 300 }),
-  phone: requireString(body.phone ?? '', 'Nomor telepon', { max: 30 }),
+  phone: requirePhone(body.phone),
   taxRate: requireNumber(body.taxRate ?? 0, 'Pajak (%)', { min: 0, max: 100, integer: false }),
   serviceChargeRate: requireNumber(body.serviceChargeRate ?? 0, 'Service charge (%)', { min: 0, max: 100, integer: false }),
   receiptHeader: requireString(body.receiptHeader ?? '', 'Header nota', { max: 500, trim: false }),

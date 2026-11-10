@@ -1,7 +1,9 @@
 import { createStockItem, listStock, parseStockInput } from '@/server/stock';
-import { handle, json, readJsonBody, requireSession } from '@/server/http';
+import { handle, json, readJsonBody, requireOwner, requireSession } from '@/server/http';
 
-// Owner and kasir both manage raw-material stock.
+const STOCK_OWNER_ONLY = 'Hanya Owner yang boleh mengubah stok.';
+
+// Everyone logged in can see the stock; only the owner changes it.
 export async function GET(request: Request) {
   return handle(request, async () => {
     await requireSession();
@@ -11,7 +13,7 @@ export async function GET(request: Request) {
 
 export async function POST(request: Request) {
   return handle(request, async () => {
-    await requireSession();
+    await requireOwner(STOCK_OWNER_ONLY);
     const item = await createStockItem(parseStockInput(await readJsonBody(request)));
     return json({ item }, 201);
   });

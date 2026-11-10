@@ -2,6 +2,7 @@ import 'server-only';
 import { AccountStatus } from '@/types';
 import { getCurrentSession, CurrentSession } from './session';
 import { roleFromLoginId } from '@/lib/access';
+import { validatePhone } from '@/lib/phone';
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
@@ -105,6 +106,14 @@ export const requireBoolean = (value: unknown, label: string): boolean => {
 export const requireOneOf = <T extends string>(value: unknown, options: readonly T[], label: string): T => {
   if (typeof value === 'string' && (options as readonly string[]).includes(value)) return value as T;
   throw new HttpError(400, `${label} tidak valid.`);
+};
+
+// Optional phone number: '' when left empty, otherwise digits (+ and separators allowed).
+export const requirePhone = (value: unknown, label = 'Nomor telepon'): string => {
+  const phone = requireString(value ?? '', label, { max: 30 });
+  const invalid = validatePhone(phone);
+  if (invalid) throw new HttpError(400, invalid);
+  return phone;
 };
 
 export const requireStatus = (value: unknown): AccountStatus => {

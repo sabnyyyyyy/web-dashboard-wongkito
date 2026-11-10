@@ -107,9 +107,9 @@ flowchart TD
 Menu, pesanan, stok, dan pengaturan toko dimuat dari API setelah login. Setiap perubahan dikirim ke server; keranjang POS tetap di browser. Pesanan dimuat ulang otomatis tiap 15 detik supaya kasir dan dapur di perangkat lain melihat pesanan yang sama.
 * `addToCart(item, notes)` / `updateCartQuantity(itemId, delta)`: Mengelola keranjang POS (lokal).
 * `createOrder(order)`: Mengirim keranjang ke `POST /api/orders`. Server menghitung ulang harga, pajak, dan kembalian, membuat nomor nota `WK-YYYYMMDD-XXX`, dan mengurangi stok porsi menu.
-* `updateOrderStatus(orderId, status)`: `pending` → `accepted` → `processing` → `ready` → `completed`, atau `cancelled` (stok porsi dikembalikan).
+* `updateOrderStatus(orderId, status)`: `pending` → `accepted` → `processing` → `ready` → `completed`, atau `cancelled` (khusus Owner; stok porsi dikembalikan).
 * `addMenuItem` / `updateMenuItem` / `deleteMenuItem` / `toggleMenuAvailability`: CRUD menu (khusus Owner).
-* `addStockItem` / `updateStockItem`: Kelola bahan baku (Owner & Kasir).
+* `addStockItem` / `updateStockItem`: Tambah/ubah/kurangi bahan baku (khusus Owner; kasir hanya bisa melihat).
 * `updateSettings`: Simpan pengaturan toko & nota (khusus Owner).
 * Semua fungsi yang mengubah data mengembalikan `false` jika gagal, dan pesan error dari server sudah ditampilkan.
 
@@ -124,8 +124,8 @@ Menu, pesanan, stok, dan pengaturan toko dimuat dari API setelah login. Setiap p
 | `/api/auth/*` | publik / login | Login, logout, sesi aktif, ganti password & nama |
 | `/api/accounts/*` | Owner | Buat, ubah, reset password akun kasir |
 | `GET /api/menu`, `POST`, `PUT/DELETE /api/menu/[id]` | baca: login, ubah: Owner | Katalog menu |
-| `GET/POST /api/stock`, `PUT /api/stock/[id]` | login | Bahan baku |
-| `GET/POST /api/orders`, `PATCH /api/orders/[id]` | login | Transaksi POS & alur dapur |
+| `GET/POST /api/stock`, `PUT /api/stock/[id]` | baca: login, ubah: Owner | Bahan baku |
+| `GET/POST /api/orders`, `PATCH /api/orders/[id]` | login (batalkan: Owner) | Transaksi POS & alur dapur |
 | `GET/PUT /api/settings` | baca: login, ubah: Owner | Pengaturan toko |
 
 Skema tabel ada di `src/server/schema.sql`; data awal (menu, stok, pengaturan) ada di `src/server/seed-data.ts` dan hanya dimasukkan ke tabel yang masih kosong.
@@ -199,3 +199,5 @@ Butuh Node.js dan PostgreSQL (versi 13 ke atas).
 
 * **Owner:** `OWN-001`, password dari `npm run db:setup` (ganti lewat menu Profile setelah login).
 * **Kasir:** dibuat oleh Owner di menu **Team** (ID `KSR-001`, `KSR-002`, ...), lengkap dengan password awalnya.
+* **Syarat password baru** (buat akun kasir & ganti password): minimal 8 karakter, ada huruf besar, huruf kecil, angka, dan simbol, tanpa spasi. Aturannya di `src/lib/password.ts`, dipakai bersama oleh form dan API.
+* **Nomor telepon** hanya angka (boleh diawali `+`, dipisah spasi atau `-`), 9–15 digit. Aturannya di `src/lib/phone.ts`.
