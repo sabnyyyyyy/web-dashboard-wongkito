@@ -1,6 +1,6 @@
 import { updateKasirAccount } from '@/server/accounts';
 import { revokeSessions } from '@/server/session';
-import { handle, HttpError, json, readJsonBody, requireOwner, requireStatus, requireString } from '@/server/http';
+import { handle, HttpError, json, readJsonBody, requireOwner, requirePhone, requireStatus, requireString } from '@/server/http';
 import { normalizeLoginId } from '@/lib/access';
 
 // Owner only: edit a kasir's profile or (de)activate it. Deactivation logs the kasir out everywhere.
@@ -12,7 +12,7 @@ export async function PATCH(request: Request, ctx: RouteContext<'/api/accounts/[
 
     const account = await updateKasirAccount(loginId, {
       name: requireString(body.name, 'Nama kasir', { min: 1, max: 100 }),
-      phone: requireString(body.phone ?? '', 'Nomor HP', { max: 30 }),
+      phone: requirePhone(body.phone, 'Nomor HP'),
       shift: requireString(body.shift ?? '', 'Shift', { max: 50 }),
       status: requireStatus(body.status),
     });

@@ -38,14 +38,19 @@ let dummyHash: Promise<string> | null = null;
 export const getDummyHash = (): Promise<string> => (dummyHash ??= hashPassword(randomBytes(16).toString('hex')));
 
 // Temporary password handed out on reset or first setup, e.g. "wk-7Hq2xP9a".
+// "wk-" supplies the lowercase letter and symbol of the password rules (src/lib/password.ts);
+// the random part is redrawn until it also has an uppercase letter and a digit.
 export const generateTempPassword = (): string => {
   const alphabet = 'ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789';
   // 256 % 56 != 0 → reject bytes in the biased tail so every character is equally likely.
   const limit = 256 - (256 % alphabet.length);
   let result = '';
-  while (result.length < 10) {
-    for (const byte of randomBytes(16)) {
-      if (byte < limit && result.length < 10) result += alphabet[byte % alphabet.length];
+  while (result.length < 10 || !/[A-Z]/.test(result) || !/[0-9]/.test(result)) {
+    result = '';
+    while (result.length < 10) {
+      for (const byte of randomBytes(16)) {
+        if (byte < limit && result.length < 10) result += alphabet[byte % alphabet.length];
+      }
     }
   }
   return 'wk-' + result;

@@ -2,6 +2,7 @@ import 'server-only';
 import { AccountStatus } from '@/types';
 import { getCurrentSession, CurrentSession } from './session';
 import { roleFromLoginId } from '@/lib/access';
+import { validatePhone } from '@/lib/phone';
 
 const NO_STORE = { 'Cache-Control': 'no-store' };
 
@@ -59,10 +60,10 @@ export const requireSession = async (): Promise<CurrentSession> => {
   return session;
 };
 
-export const requireOwner = async (): Promise<CurrentSession> => {
+export const requireOwner = async (message = 'Hanya Owner yang boleh mengelola akun.'): Promise<CurrentSession> => {
   const session = await requireSession();
   if (roleFromLoginId(session.account.login_id) !== 'superadmin') {
-    throw new HttpError(403, 'Hanya Owner yang boleh mengelola akun.');
+    throw new HttpError(403, message);
   }
   return session;
 };
@@ -83,6 +84,36 @@ export const requireString = (value: unknown, label: string, { min = 0, max = 20
   if (cleaned.length < min) throw new HttpError(400, `${label} wajib diisi.`);
   if (cleaned.length > max) throw new HttpError(400, `${label} maksimal ${max} karakter.`);
   return cleaned;
+};
+
+export const requireNumber = (
+  value: unknown,
+  label: string,
+  { min = 0, max = 1_000_000_000, integer = true } = {}
+): number => {
+  const n = typeof value === 'string' && value.trim() !== '' ? Number(value) : value;
+  if (typeof n !== 'number' || !Number.isFinite(n)) throw new HttpError(400, `${label} harus berupa angka.`);
+  if (integer && !Number.isInteger(n)) throw new HttpError(400, `${label} harus bilangan bulat.`);
+  if (n < min || n > max) throw new HttpError(400, `${label} harus di antara ${min} dan ${max}.`);
+  return n;
+};
+
+export const requireBoolean = (value: unknown, label: string): boolean => {
+  if (typeof value !== 'boolean') throw new HttpError(400, `${label} tidak valid.`);
+  return value;
+};
+
+export const requireOneOf = <T extends string>(value: unknown, options: readonly T[], label: string): T => {
+  if (typeof value === 'string' && (options as readonly string[]).includes(value)) return value as T;
+  throw new HttpError(400, `${label} tidak valid.`);
+};
+
+// Optional phone number: '' when left empty, otherwise digits (+ and separators allowed).
+export const requirePhone = (value: unknown, label = 'Nomor telepon'): string => {
+  const phone = requireString(value ?? '', label, { max: 30 });
+  const invalid = validatePhone(phone);
+  if (invalid) throw new HttpError(400, invalid);
+  return phone;
 };
 
 export const requireStatus = (value: unknown): AccountStatus => {

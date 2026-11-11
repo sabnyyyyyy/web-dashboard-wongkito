@@ -1,5 +1,5 @@
 import { createKasirAccount, listKasirAccounts } from '@/server/accounts';
-import { handle, HttpError, json, readJsonBody, requireOwner, requireString } from '@/server/http';
+import { handle, HttpError, json, readJsonBody, requireOwner, requirePhone, requireString } from '@/server/http';
 import { validateNewPassword } from '@/lib/password';
 
 // Owner only: list kasir accounts.
@@ -16,7 +16,7 @@ export async function POST(request: Request) {
     await requireOwner();
     const body = await readJsonBody(request);
     const name = requireString(body.name, 'Nama kasir', { min: 1, max: 100 });
-    const phone = requireString(body.phone ?? '', 'Nomor HP', { max: 30 });
+    const phone = requirePhone(body.phone, 'Nomor HP');
     const shift = requireString(body.shift ?? '', 'Shift', { max: 50 });
     const password = requireString(body.password, 'Password', { min: 1, max: 1000, trim: false });
 
