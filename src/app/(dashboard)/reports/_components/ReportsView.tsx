@@ -2,7 +2,8 @@
 
 import React, { useState } from 'react';
 import { useApp } from '@/app/_context/AppContext';
-import { formatRupiah } from '@/app/_utils/format';
+import { formatDateTime, formatRupiah } from '@/app/_utils/format';
+import { Order } from '@/types';
 import {
   Search,
   Receipt,
@@ -34,201 +35,41 @@ export interface HistoryOrder {
   notes?: string;
 }
 
-// Initial orders matching screenshot exactly on Page 1
-const INITIAL_HISTORY_ORDERS: HistoryOrder[] = [
-  // Page 1 (Matching screenshot exactly)
-  {
-    id: 'WK-001',
-    orderNumber: 'WK-001',
-    customerName: 'Dian Pratiwi',
-    totalItem: 3,
-    totalBayar: 42000,
-    tanggalWaktu: '16 Sep 2026, 09:40',
-    status: 'Selesai',
-    paymentMethod: 'QRIS',
-    items: [
-      { name: 'Kopi Susu Aren', qty: 1, price: 18000 },
-      { name: 'Americano Ice', qty: 1, price: 15000 },
-      { name: 'Roti Bakar Cokelat', qty: 1, price: 9000 },
-    ],
-  },
-  {
-    id: 'WK-002',
-    orderNumber: 'WK-002',
-    customerName: 'Ahmad Faisal',
-    totalItem: 1,
-    totalBayar: 18000,
-    tanggalWaktu: '16 Sep 2026, 09:15',
-    status: 'Selesai',
-    paymentMethod: 'Cash',
-    items: [{ name: 'Kopi Susu Aren', qty: 1, price: 18000 }],
-  },
-  {
-    id: 'WK-003',
-    orderNumber: 'WK-003',
-    customerName: 'Rina Gunawan',
-    totalItem: 4,
-    totalBayar: 65000,
-    tanggalWaktu: '16 Sep 2026, 08:50',
-    status: 'Dibatalkan',
-    paymentMethod: 'Cash',
-    items: [
-      { name: 'Pempek Kapal Selam', qty: 1, price: 25000 },
-      { name: 'Pempek Lenjer', qty: 2, price: 20000 },
-      { name: 'Es Teh Manis', qty: 1, price: 20000 },
-    ],
-    notes: 'Pelanggan membatalkan pesanan karena buru-buru.',
-  },
-  {
-    id: 'WK-004',
-    orderNumber: 'WK-004',
-    customerName: 'Kevin Sanjaya',
-    totalItem: 2,
-    totalBayar: 30000,
-    tanggalWaktu: '15 Sep 2026, 21:10',
-    status: 'Selesai',
-    paymentMethod: 'QRIS',
-    items: [
-      { name: 'Kopi Tarik', qty: 1, price: 15000 },
-      { name: 'Pisang Goreng Crispy', qty: 1, price: 15000 },
-    ],
-  },
-  {
-    id: 'WK-1016',
-    orderNumber: 'WK-1016',
-    customerName: 'Maya Indah',
-    totalItem: 2,
-    totalBayar: 28000,
-    tanggalWaktu: '15 Sep 2026, 20:30',
-    status: 'Selesai',
-    paymentMethod: 'QRIS',
-    items: [
-      { name: 'Kopi O Dingin', qty: 1, price: 12000 },
-      { name: 'Singkong Keju', qty: 1, price: 16000 },
-    ],
-  },
-  // Page 2 Mock Data
-  {
-    id: 'WK-1015',
-    orderNumber: 'WK-1015',
-    customerName: 'Bagus Pratama',
-    totalItem: 3,
-    totalBayar: 45000,
-    tanggalWaktu: '15 Sep 2026, 19:45',
-    status: 'Selesai',
-    paymentMethod: 'Cash',
-    items: [
-      { name: 'Mie Tumis Wong Kito', qty: 1, price: 22000 },
-      { name: 'Kopi Susu Aren', qty: 1, price: 18000 },
-      { name: 'Kerupuk Ikan Palembang', qty: 1, price: 5000 },
-    ],
-  },
-  {
-    id: 'WK-1014',
-    orderNumber: 'WK-1014',
-    customerName: 'Siti Rahma',
-    totalItem: 2,
-    totalBayar: 32000,
-    tanggalWaktu: '15 Sep 2026, 18:20',
-    status: 'Selesai',
-    paymentMethod: 'QRIS',
-    items: [
-      { name: 'Pempek Kulit Crispy', qty: 2, price: 24000 },
-      { name: 'Es Teh Manis', qty: 1, price: 8000 },
-    ],
-  },
-  {
-    id: 'WK-1013',
-    orderNumber: 'WK-1013',
-    customerName: 'Doni Saputra',
-    totalItem: 1,
-    totalBayar: 15000,
-    tanggalWaktu: '15 Sep 2026, 17:10',
-    status: 'Selesai',
-    paymentMethod: 'Cash',
-    items: [{ name: 'Kopi Hitam Robusta', qty: 1, price: 15000 }],
-  },
-  {
-    id: 'WK-1012',
-    orderNumber: 'WK-1012',
-    customerName: 'Anisa Putri',
-    totalItem: 2,
-    totalBayar: 36000,
-    tanggalWaktu: '15 Sep 2026, 16:05',
-    status: 'Selesai',
-    paymentMethod: 'QRIS',
-    items: [
-      { name: 'Kopi Susu Regal', qty: 1, price: 20000 },
-      { name: 'Roti Bakar Keju', qty: 1, price: 16000 },
-    ],
-  },
-  {
-    id: 'WK-1011',
-    orderNumber: 'WK-1011',
-    customerName: 'Hendra Wijaya',
-    totalItem: 3,
-    totalBayar: 52000,
-    tanggalWaktu: '15 Sep 2026, 15:00',
-    status: 'Selesai',
-    paymentMethod: 'Cash',
-    items: [
-      { name: 'Nasi Goreng Kampung', qty: 1, price: 25000 },
-      { name: 'Telur Dadar', qty: 1, price: 7000 },
-      { name: 'Es Jeruk Peras', qty: 1, price: 20000 },
-    ],
-  },
-  // Page 3 Mock Data
-  {
-    id: 'WK-1010',
-    orderNumber: 'WK-1010',
-    customerName: 'Farhan Maulana',
-    totalItem: 2,
-    totalBayar: 34000,
-    tanggalWaktu: '15 Sep 2026, 13:40',
-    status: 'Selesai',
-    paymentMethod: 'QRIS',
-    items: [
-      { name: 'Kopi Susu Pandan', qty: 1, price: 19000 },
-      { name: 'Pisang Coklat Lumer', qty: 1, price: 15000 },
-    ],
-  },
-  {
-    id: 'WK-1009',
-    orderNumber: 'WK-1009',
-    customerName: 'Dewi Lestari',
-    totalItem: 1,
-    totalBayar: 20000,
-    tanggalWaktu: '15 Sep 2026, 12:15',
-    status: 'Selesai',
-    paymentMethod: 'Cash',
-    items: [{ name: 'Es Coklat Klasik', qty: 1, price: 20000 }],
-  },
-  {
-    id: 'WK-1008',
-    orderNumber: 'WK-1008',
-    customerName: 'Rizky Ramadhan',
-    totalItem: 4,
-    totalBayar: 68000,
-    tanggalWaktu: '15 Sep 2026, 11:30',
-    status: 'Selesai',
-    paymentMethod: 'QRIS',
-    items: [
-      { name: 'Pempek Campur Komplit', qty: 1, price: 35000 },
-      { name: 'Kopi Susu Aren', qty: 2, price: 36000 },
-    ],
-  },
-];
+const PAYMENT_LABEL: Record<Order['paymentMethod'], string> = {
+  cash: 'Tunai',
+  qris: 'QRIS',
+  transfer: 'Transfer',
+  debit: 'Debit',
+};
+
+// History shows finished orders only; active ones live on the Pesanan page.
+const toHistoryOrder = (order: Order): HistoryOrder => ({
+  id: order.id,
+  orderNumber: order.orderNumber,
+  customerName: order.customerName,
+  totalItem: order.items.reduce((sum, ci) => sum + ci.quantity, 0),
+  totalBayar: order.total,
+  tanggalWaktu: formatDateTime(order.createdAt),
+  status: order.status === 'completed' ? 'Selesai' : 'Dibatalkan',
+  paymentMethod: PAYMENT_LABEL[order.paymentMethod],
+  items: order.items.map((ci) => ({ name: ci.menuItem.name, qty: ci.quantity, price: ci.menuItem.price * ci.quantity })),
+  ...(order.notes ? { notes: order.notes } : {}),
+});
 
 export const ReportsView: React.FC = () => {
-  const { setShowReceiptModal, setLastCompletedOrder } = useApp();
+  const { orders, setShowReceiptModal, setLastCompletedOrder } = useApp();
   const [searchTerm, setSearchTerm] = useState('');
   const [currentPage, setCurrentPage] = useState<number>(1);
   const [selectedOrder, setSelectedOrder] = useState<HistoryOrder | null>(null);
 
   const itemsPerPage = 5;
 
+  const historyOrders = orders
+    .filter((o) => o.status === 'completed' || o.status === 'cancelled')
+    .map(toHistoryOrder);
+
   // Filter based on search term
-  const filteredOrders = INITIAL_HISTORY_ORDERS.filter((order) => {
+  const filteredOrders = historyOrders.filter((order) => {
     const matchId = order.orderNumber.toLowerCase().includes(searchTerm.toLowerCase());
     const matchName = order.customerName.toLowerCase().includes(searchTerm.toLowerCase());
     return matchId || matchName;
@@ -241,37 +82,9 @@ export const ReportsView: React.FC = () => {
   );
 
   const handlePrintReceipt = (order: HistoryOrder) => {
-    setLastCompletedOrder({
-      id: order.id,
-      orderNumber: '#' + order.orderNumber,
-      customerName: order.customerName,
-      items: order.items.map((it, idx) => ({
-        menuItem: {
-          id: `${order.id}-${idx}`,
-          name: it.name,
-          category: 'kopi',
-          price: it.price,
-          costPrice: Math.round(it.price * 0.5),
-          description: '',
-          image: '',
-          isAvailable: true,
-          stock: 10,
-        },
-        quantity: it.qty,
-      })),
-      orderType: 'takeaway',
-      subtotal: order.totalBayar,
-      tax: 0,
-      discount: 0,
-      total: order.totalBayar,
-      amountPaid: order.totalBayar,
-      change: 0,
-      paymentMethod: (order.paymentMethod.toLowerCase() === 'qris' ? 'qris' : 'cash') as any,
-      paymentStatus: 'paid',
-      status: order.status === 'Selesai' ? 'completed' : 'cancelled',
-      createdAt: order.tanggalWaktu,
-      cashierName: 'Budi (Kasir)',
-    });
+    const raw = orders.find((o) => o.id === order.id);
+    if (!raw) return;
+    setLastCompletedOrder(raw);
     setShowReceiptModal(true);
   };
 

@@ -2,6 +2,9 @@
 
 import React, { useState } from 'react';
 import { playChime } from '@/app/_utils/format';
+import { useApp } from '@/app/_context/AppContext';
+import { useAuth } from '@/app/_context/AuthContext';
+import { StockItem } from '@/types';
 import {
   Package,
   CheckCircle2,
@@ -24,86 +27,56 @@ interface StockRow {
   status: 'TERSEDIA' | 'MENIPIS' | 'HABIS';
 }
 
-const INITIAL_STOCK_ITEMS: StockRow[] = [
-  {
-    id: 'stk-1',
-    name: 'Kopi Arabika Gayo',
-    category: 'Bahan Utama',
-    currentStock: 0,
-    unit: 'Kg',
-    minStock: '2 Kg',
-    status: 'HABIS',
-  },
-  {
-    id: 'stk-2',
-    name: 'Fresh Milk',
-    category: 'Bahan Utama',
-    currentStock: 2,
-    unit: 'Liter',
-    minStock: '5 Liter',
-    status: 'MENIPIS',
-  },
-  {
-    id: 'stk-3',
-    name: 'Gula Pasir Tebu',
-    category: 'Bahan Pembantu',
-    currentStock: 0,
-    unit: 'Kg',
-    minStock: '3 Kg',
-    status: 'HABIS',
-  },
-  {
-    id: 'stk-4',
-    name: 'Kopi Robusta Lahat',
-    category: 'Bahan Utama',
-    currentStock: 8,
-    unit: 'Kg',
-    minStock: '3 Kg',
-    status: 'TERSEDIA',
-  },
-  {
-    id: 'stk-5',
-    name: 'Susu Kental Manis',
-    category: 'Bahan Utama',
-    currentStock: 14,
-    unit: 'Kaleng',
-    minStock: '4 Kaleng',
-    status: 'TERSEDIA',
-  },
-  {
-    id: 'stk-6',
-    name: 'Teh Celup Melati',
-    category: 'Bahan Utama',
-    currentStock: 5,
-    unit: 'Pack',
-    minStock: '2 Pack',
-    status: 'TERSEDIA',
-  },
-];
+// Minimum stock given to items added from this form (the form has no field for it).
+const DEFAULT_MIN_STOCK = 5;
+
+const stockStatus = (item: Pick<StockItem, 'currentStock' | 'minStock'>): StockRow['status'] => {
+  if (item.currentStock <= 0) return 'HABIS';
+  if (item.currentStock <= item.minStock) return 'MENIPIS';
+  return 'TERSEDIA';
+};
+
+const toStockRow = (item: StockItem): StockRow => ({
+  id: item.id,
+  name: item.name,
+  category: item.category as StockRow['category'],
+  currentStock: item.currentStock,
+  unit: item.unit,
+  minStock: `${item.minStock} ${item.unit}`,
+  status: stockStatus(item),
+});
+
+const EMPTY_FORM = {
+  name: '',
+  category: 'Bahan Utama' as StockRow['category'],
+  currentStock: 0,
+  unit: 'Kg',
+};
 
 export const InventoryView: React.FC = () => {
-  const [stockList, setStockList] = useState<StockRow[]>(INITIAL_STOCK_ITEMS);
+  const { stockItems, addStockItem, updateStockItem } = useApp();
+  const { user } = useAuth();
+  // Kasir only sees the stock; adding, editing and reducing it is the owner's job (the server enforces it too).
+  const canEditStock = user?.role === 'superadmin';
+  const stockList = stockItems.map(toStockRow);
   const [searchQuery, setSearchQuery] = useState('');
   const [toastMessage, setToastMessage] = useState('');
 
   // Update Stock Form View state
   const [isUpdateFormOpen, setIsUpdateFormOpen] = useState(false);
   const [selectedItemToEdit, setSelectedItemToEdit] = useState<StockRow | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
-  // Form State matching screenshot
-  const [formData, setFormData] = useState({
-    name: 'Fresh Milk',
-    category: 'Bahan Utama' as StockRow['category'],
-    currentStock: 2,
-    unit: 'Liter',
-  });
+  const [formData, setFormData] = useState(EMPTY_FORM);
 
   // Check if opened from notification or external action
   React.useEffect(() => {
+    if (stockItems.length === 0) return;
     const itemToEdit = localStorage.getItem('open_update_stock_item');
     if (itemToEdit) {
       localStorage.removeItem('open_update_stock_item');
-      const found = stockList.find((s) => s.name.toLowerCase().includes(itemToEdit.toLowerCase()));
+      if (!canEditStock) return;
+      const found = stockItems.map(toStockRow).find((s) => s.name.toLowerCase().includes(itemToEdit.toLowerCase()));
       if (found) {
         setSelectedItemToEdit(found);
         setFormData({
@@ -115,14 +88,16 @@ export const InventoryView: React.FC = () => {
       }
       setIsUpdateFormOpen(true);
     }
-  }, [stockList]);
+  }, [stockItems, canEditStock]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
     setTimeout(() => setToastMessage(''), 3500);
   };
 
+  // With an item: edit it. Without: blank form for a new item.
   const handleOpenUpdateForm = (item?: StockRow) => {
+    if (!canEditStock) return;
     if (item) {
       setSelectedItemToEdit(item);
       setFormData({
@@ -132,88 +107,34 @@ export const InventoryView: React.FC = () => {
         unit: item.unit,
       });
     } else {
-      // Default to Fresh Milk matching screenshot
-      const freshMilk = stockList.find((s) => s.name.toLowerCase().includes('fresh milk'));
-      if (freshMilk) {
-        setSelectedItemToEdit(freshMilk);
-        setFormData({
-          name: freshMilk.name,
-          category: freshMilk.category,
-          currentStock: freshMilk.currentStock,
-          unit: freshMilk.unit,
-        });
-      } else {
-        setSelectedItemToEdit(null);
-        setFormData({
-          name: 'Fresh Milk',
-          category: 'Bahan Utama',
-          currentStock: 2,
-          unit: 'Liter',
-        });
-      }
+      setSelectedItemToEdit(null);
+      setFormData(EMPTY_FORM);
     }
     setIsUpdateFormOpen(true);
   };
 
-  const handleSaveStock = (e: React.FormEvent) => {
+  const handleSaveStock = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (isSaving) return;
 
-    let newStatus: StockRow['status'] = 'TERSEDIA';
-    if (formData.currentStock === 0) newStatus = 'HABIS';
-    else if (formData.currentStock <= 5) newStatus = 'MENIPIS';
+    const fields = {
+      name: formData.name.trim(),
+      category: formData.category,
+      currentStock: formData.currentStock,
+      unit: formData.unit,
+    };
+    // Typing the name of an existing item updates that item instead of creating a duplicate.
+    const target =
+      selectedItemToEdit ?? stockList.find((s) => s.name.toLowerCase() === fields.name.toLowerCase()) ?? null;
 
-    if (selectedItemToEdit) {
-      // Update existing item
-      setStockList((prev) =>
-        prev.map((item) =>
-          item.id === selectedItemToEdit.id
-            ? {
-                ...item,
-                name: formData.name,
-                category: formData.category,
-                currentStock: formData.currentStock,
-                unit: formData.unit,
-                status: newStatus,
-              }
-            : item
-        )
-      );
-      showToast(`Stok "${formData.name}" berhasil diperbarui!`);
-    } else {
-      // Create or update by name
-      const existing = stockList.find(
-        (s) => s.name.toLowerCase() === formData.name.toLowerCase()
-      );
-      if (existing) {
-        setStockList((prev) =>
-          prev.map((item) =>
-            item.id === existing.id
-              ? {
-                  ...item,
-                  category: formData.category,
-                  currentStock: formData.currentStock,
-                  unit: formData.unit,
-                  status: newStatus,
-                }
-              : item
-          )
-        );
-        showToast(`Stok "${formData.name}" berhasil diperbarui!`);
-      } else {
-        const newItem: StockRow = {
-          id: 'stk-' + Date.now(),
-          name: formData.name,
-          category: formData.category,
-          currentStock: formData.currentStock,
-          unit: formData.unit,
-          minStock: `5 ${formData.unit}`,
-          status: newStatus,
-        };
-        setStockList((prev) => [newItem, ...prev]);
-        showToast(`Item "${formData.name}" berhasil ditambahkan!`);
-      }
-    }
+    setIsSaving(true);
+    const ok = target
+      ? await updateStockItem(target.id, fields)
+      : await addStockItem({ ...fields, minStock: DEFAULT_MIN_STOCK, costPerUnit: 0, supplier: '' });
+    setIsSaving(false);
+    if (!ok) return;
 
+    showToast(target ? `Stok "${fields.name}" berhasil diperbarui!` : `Item "${fields.name}" berhasil ditambahkan!`);
     playChime('success');
     setIsUpdateFormOpen(false);
   };
@@ -225,13 +146,13 @@ export const InventoryView: React.FC = () => {
   );
 
   // Stats calculation
-  const totalItemsCount = 28;
-  const tersediaCount = stockList.filter((s) => s.status === 'TERSEDIA').length + 18;
-  const menipisCount = stockList.filter((s) => s.status === 'MENIPIS').length + 3;
-  const habisCount = stockList.filter((s) => s.status === 'HABIS').length + 1;
+  const totalItemsCount = stockList.length;
+  const tersediaCount = stockList.filter((s) => s.status === 'TERSEDIA').length;
+  const menipisCount = stockList.filter((s) => s.status === 'MENIPIS').length;
+  const habisCount = stockList.filter((s) => s.status === 'HABIS').length;
 
   // RENDER UPDATE STOK FORM (Matching user screenshot)
-  if (isUpdateFormOpen) {
+  if (isUpdateFormOpen && canEditStock) {
     return (
       <div className="w-full max-w-4xl mx-auto space-y-6 animate-fade-in">
         {/* Header matching screenshot */}
@@ -335,10 +256,11 @@ export const InventoryView: React.FC = () => {
             <div className="flex items-center gap-3 pt-1">
               <button
                 type="submit"
-                className="px-5 py-2.5 bg-[#F47C0B] hover:bg-[#EA580C] text-white font-bold text-xs rounded-[8px] flex items-center gap-2 shadow-2xs transition-all cursor-pointer"
+                disabled={isSaving}
+                className="px-5 py-2.5 bg-[#F47C0B] hover:bg-[#EA580C] text-white font-bold text-xs rounded-[8px] flex items-center gap-2 shadow-2xs transition-all cursor-pointer disabled:opacity-60 disabled:cursor-not-allowed"
               >
                 <Save className="w-4 h-4 text-white" />
-                <span>Simpan Stok</span>
+                <span>{isSaving ? 'Menyimpan...' : 'Simpan Stok'}</span>
               </button>
 
               <button
@@ -369,13 +291,19 @@ export const InventoryView: React.FC = () => {
           </p>
         </div>
 
-        <button
-          onClick={() => handleOpenUpdateForm()}
-          className="px-4 py-2.5 bg-[#F47C0B] hover:bg-[#EA580C] text-white font-bold text-xs rounded-[8px] shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 uppercase tracking-wider"
-        >
-          <Plus className="w-4 h-4" />
-          <span>+ UPDATE STOK</span>
-        </button>
+        {canEditStock ? (
+          <button
+            onClick={() => handleOpenUpdateForm()}
+            className="px-4 py-2.5 bg-[#F47C0B] hover:bg-[#EA580C] text-white font-bold text-xs rounded-[8px] shadow-2xs transition-all cursor-pointer flex items-center justify-center gap-1.5 shrink-0 uppercase tracking-wider"
+          >
+            <Plus className="w-4 h-4" />
+            <span>+ UPDATE STOK</span>
+          </button>
+        ) : (
+          <span className="px-3 py-2 bg-[#F1F1EF] text-[#525252] font-semibold text-[11px] rounded-[8px] shrink-0">
+            Hanya lihat · perubahan stok dilakukan Owner
+          </span>
+        )}
       </div>
 
       {toastMessage && (
@@ -476,7 +404,7 @@ export const InventoryView: React.FC = () => {
                 <th className="py-3 px-4">SATUAN</th>
                 <th className="py-3 px-4">BATAS MINIMUM</th>
                 <th className="py-3 px-4 text-center">STATUS</th>
-                <th className="py-3 px-4 text-center">AKSI</th>
+                {canEditStock && <th className="py-3 px-4 text-center">AKSI</th>}
               </tr>
             </thead>
             <tbody className="divide-y divide-[#E5E7EB]">
@@ -535,23 +463,25 @@ export const InventoryView: React.FC = () => {
                   </td>
 
                   {/* AKSI */}
-                  <td className="py-3.5 px-4 text-center">
-                    <div className="flex items-center justify-center gap-1.5">
-                      <button
-                        onClick={() => handleOpenUpdateForm(row)}
-                        className="px-3 py-1 bg-white hover:bg-[#F1F1EF] border border-[#D1D5DB] text-[#525252] hover:text-[#242424] font-bold text-xs rounded-[6px] transition-colors cursor-pointer"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleOpenUpdateForm(row)}
-                        className="px-2.5 py-1 bg-[#242424] hover:bg-black text-white font-bold text-xs rounded-[6px] transition-colors cursor-pointer flex items-center gap-1"
-                      >
-                        <Plus className="w-3 h-3" />
-                        <span>Stok</span>
-                      </button>
-                    </div>
-                  </td>
+                  {canEditStock && (
+                    <td className="py-3.5 px-4 text-center">
+                      <div className="flex items-center justify-center gap-1.5">
+                        <button
+                          onClick={() => handleOpenUpdateForm(row)}
+                          className="px-3 py-1 bg-white hover:bg-[#F1F1EF] border border-[#D1D5DB] text-[#525252] hover:text-[#242424] font-bold text-xs rounded-[6px] transition-colors cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          onClick={() => handleOpenUpdateForm(row)}
+                          className="px-2.5 py-1 bg-[#242424] hover:bg-black text-white font-bold text-xs rounded-[6px] transition-colors cursor-pointer flex items-center gap-1"
+                        >
+                          <Plus className="w-3 h-3" />
+                          <span>Stok</span>
+                        </button>
+                      </div>
+                    </td>
+                  )}
                 </tr>
               ))}
             </tbody>

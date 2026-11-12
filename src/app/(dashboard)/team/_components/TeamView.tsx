@@ -3,8 +3,10 @@
 import React, { useState } from 'react';
 import { AccountStatus, StaffAccount } from '@/types';
 import { useAuth } from '@/app/_context/AuthContext';
-import { MIN_PASSWORD_LENGTH } from '@/lib/password';
+import { MIN_PASSWORD_LENGTH, validateNewPassword } from '@/lib/password';
+import { sanitizePhoneInput, validatePhone } from '@/lib/phone';
 import { playChime } from '@/app/_utils/format';
+import { PasswordChecklist } from '@/app/_components/common/PasswordChecklist';
 import {
   Plus,
   KeyRound,
@@ -67,6 +69,12 @@ export const TeamView: React.FC = () => {
 
   const handleAddSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    // Same checks as the server, so mistakes show up before the request.
+    const invalid = validatePhone(formData.phone) ?? validateNewPassword(formData.password);
+    if (invalid) {
+      setFormError(invalid);
+      return;
+    }
     setFormError('');
     setIsSubmitting(true);
     try {
@@ -90,6 +98,11 @@ export const TeamView: React.FC = () => {
     e.preventDefault();
     if (!editingMember) return;
 
+    const invalidPhone = validatePhone(editingMember.phone);
+    if (invalidPhone) {
+      setFormError(invalidPhone);
+      return;
+    }
     setFormError('');
     setIsSubmitting(true);
     try {
@@ -342,10 +355,12 @@ export const TeamView: React.FC = () => {
               <div>
                 <label className="block font-bold text-[#525252] mb-1">Nomor WhatsApp / HP</label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   required
                   value={formData.phone}
-                  onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                  onChange={(e) => setFormData({ ...formData, phone: sanitizePhoneInput(e.target.value) })}
                   placeholder="e.g. 0857 3333 4400"
                   className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
                 />
@@ -378,6 +393,7 @@ export const TeamView: React.FC = () => {
                   placeholder={`Min ${MIN_PASSWORD_LENGTH} karakter`}
                   className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
                 />
+                <PasswordChecklist password={formData.password} />
               </div>
 
               <div className="flex gap-2 pt-2">
@@ -440,10 +456,12 @@ export const TeamView: React.FC = () => {
               <div>
                 <label className="block font-bold text-[#525252] mb-1">Nomor WhatsApp / HP</label>
                 <input
-                  type="text"
+                  type="tel"
+                  inputMode="tel"
+                  autoComplete="tel"
                   required
                   value={editingMember.phone}
-                  onChange={(e) => setEditingMember({ ...editingMember, phone: e.target.value })}
+                  onChange={(e) => setEditingMember({ ...editingMember, phone: sanitizePhoneInput(e.target.value) })}
                   className="w-full px-3 py-2 bg-[#FAFAF9] border border-[#F1F1EF] rounded-[8px] focus:outline-none focus:border-[#F47C0B]"
                 />
               </div>
