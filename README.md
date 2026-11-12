@@ -4,6 +4,32 @@ Sistem Manajemen Operasional & Kasir POS (*Point of Sale*) modern berbasis web u
 
 ---
 
+## 🆕 Pembaruan Terbaru (November 2026)
+
+### Backend & Database
+* **Data tersimpan di PostgreSQL**, tidak lagi di browser. Menu, pesanan, stok bahan baku, pengaturan toko, dan akun staf disimpan di database, jadi semua perangkat kasir melihat data yang sama.
+* **API baru** di `src/app/api/`: `/api/auth`, `/api/accounts`, `/api/menu`, `/api/stock`, `/api/orders`, `/api/settings`. Daftar lengkapnya ada di bagian [Backend](#3-backend-srcappapi-srcserver).
+* **Transaksi dihitung di server.** Harga, diskon, pajak PB1, total, kembalian, dan nomor nota (`WK-YYYYMMDD-XXX`) dihitung dari database, bukan dari browser. Stok porsi menu berkurang otomatis saat checkout dan kembali saat pesanan dibatalkan.
+* **Setup database sekali jalan:** `npm run db:setup` membuat tabel, data awal (menu, stok, pengaturan), dan akun Owner pertama. Lupa password Owner? `npm run db:reset-owner`.
+
+### Login & Hak Akses
+* **Login memakai ID** (`OWN-001` untuk Owner, `KSR-001`, `KSR-002`, ... untuk kasir). Sesi login disimpan di server dengan cookie httpOnly.
+* **Owner membuat akun kasir** di menu **Team**: tambah, edit, nonaktifkan, dan reset password.
+* **Batasan kasir:** kasir hanya bisa **melihat** stok bahan baku (tidak bisa menambah, mengubah, atau mengurangi) dan **tidak bisa membatalkan transaksi**. Aturan ini dicek di server, bukan hanya disembunyikan di tampilan.
+
+### Validasi Data
+* **Syarat password baru:** minimal 8 karakter, ada huruf besar, huruf kecil, angka, dan simbol, tanpa spasi. Form menampilkan checklist yang berubah saat mengetik.
+* **Nomor telepon hanya angka** (boleh diawali `+`, dipisah spasi atau `-`, 9–15 digit), untuk akun kasir dan pengaturan toko.
+
+### Tampilan & Struktur
+* **Satu URL per halaman:** `/dashboard`, `/pos`, `/orders`, `/menu`, `/inventory`, `/reports`, `/attendance`, `/team`, `/notifications`, `/profile`, `/settings`. Halaman bisa di-bookmark, dan tombol back browser berfungsi.
+* **Semua komponen dipindah ke dalam `src/app`.** Komponen tiap fitur ada di folder halamannya (`_components`), sedangkan yang dipakai bersama ada di `src/app/_components`.
+* **Dashboard, Pesanan, Riwayat, dan Stok** menampilkan angka dan data asli dari database, bukan contoh statis.
+
+> **Belum tersambung ke database:** halaman **Absensi** dan **Notifikasi**, grafik di Overview, serta kotak "Kehadiran" dan "AI Insight" di Dashboard masih memakai data contoh.
+
+---
+
 ## 🚀 Teknologi Utama (Tech Stack)
 
 * **Framework:** [Next.js](https://nextjs.org) 16 (App Router) & [React](https://react.dev) 19
@@ -12,6 +38,8 @@ Sistem Manajemen Operasional & Kasir POS (*Point of Sale*) modern berbasis web u
 * **Ikonografi & Visual:** [Lucide React](https://lucide.dev), [Recharts](https://recharts.org), [Canvas Confetti](https://www.npmjs.com/package/canvas-confetti)
 * **State Management:** React Context API (`AuthContext` & `AppContext`) dengan persistensi lokal (`localStorage`)
 * **Audio Engine:** Web Audio API (Synthesizer efek suara tanpa aset eksternal)
+* **Backend:** Next.js Route Handlers (`src/app/api/*`) dengan logika server di `src/server/*`
+* **Database:** [PostgreSQL](https://www.postgresql.org) 13+ melalui library [`pg`](https://node-postgres.com). Sejak pembaruan November 2026, data menu, pesanan, stok, pengaturan, dan akun disimpan di sini, tidak lagi di `localStorage`.
 
 ---
 
