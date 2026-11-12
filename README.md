@@ -198,11 +198,14 @@ Butuh Node.js dan PostgreSQL (versi 13 ke atas).
      contoh di Windows: `C:\Program Files\PostgreSQL\18\bin\`.
      ```bash
      initdb -D .pgdata -U wongkito --auth=scram-sha-256 --pwprompt -E UTF8 --locale=C
-     pg_ctl -D .pgdata -o "-p 5433" -l .pgdata/server.log start
+     pg_ctl -D .pgdata -o "-p 5433" -l .pgdata.log start
      createdb -h localhost -p 5433 -U wongkito wongkito
      ```
      Lalu isi `DATABASE_URL=postgres://wongkito:PASSWORD_TADI@localhost:5433/wongkito`.
-     Setelah komputer restart, jalankan lagi baris `pg_ctl ... start`.
+     Setelah komputer restart, jalankan lagi baris `pg_ctl ... start`. Sebelum mematikan komputer, matikan database dulu
+     dengan `pg_ctl -D .pgdata stop` supaya tidak perlu pemulihan saat dinyalakan lagi.
+     File log sengaja ditaruh di luar folder data (`.pgdata.log`, bukan `.pgdata/server.log`): di Windows, log di dalam
+     `.pgdata` bisa terkunci dan memperlambat pemulihan database.
 
 3. **Buat tabel, data awal, dan akun Owner:**
    ```bash
