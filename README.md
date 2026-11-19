@@ -197,6 +197,8 @@ Butuh Node.js dan PostgreSQL (versi 13 ke atas).
 
 ## 🔑 Akun & Login
 
+[📚 Dokumentasi Logging](docs/LOGGING.md) (menjelaskan arsitektur, format, retensi, dan cara membaca log)
+
 * **Owner:** `OWN-001`, password dari `npm run db:setup` (ganti lewat menu Profile setelah login).
 * **Kasir:** dibuat oleh Owner di menu **Team** (ID `KSR-001`, `KSR-002`, ...), lengkap dengan password awalnya.
 * **Syarat password baru** (buat akun kasir & ganti password): minimal 8 karakter, ada huruf besar, huruf kecil, angka, dan simbol, tanpa spasi. Aturannya di `src/lib/password.ts`, dipakai bersama oleh form dan API.
