@@ -223,6 +223,14 @@ Butuh Node.js dan PostgreSQL (versi 13 ke atas).
 
 ---
 
+## 📚 Dokumentasi Fitur
+
+* [📚 Dokumentasi Sistem Logging](docs/LOGGING.md) – Menjelaskan arsitektur, format, retensi, pengujian, dan cara membaca log transaksi & audit.
+* [🍽️ Dokumentasi Manajemen Menu](docs/MENU.md) – Menjelaskan katalog menu, hak akses Owner vs. Kasir, modal Tambah/Edit via React Portal, soft-delete, pencarian, dan filter kategori.
+* [📦 Dokumentasi Manajemen Inventory](docs/INVENTORY.md) – Menjelaskan kontrol stok bahan baku, modal Update Stok, aksi cepat `+ Stok` dan `− Stok`, proteksi stok negatif, serta pembaruan statistik otomatis.
+
+---
+
 ## 🔑 Akun & Login
 
 [📚 Dokumentasi Logging](docs/LOGGING.md) (menjelaskan arsitektur, format, retensi, dan cara membaca log)

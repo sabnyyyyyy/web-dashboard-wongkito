@@ -9,6 +9,7 @@ import {
   LayoutGrid,
   ShoppingBag,
   Package,
+  Utensils,
   CalendarCheck,
   Users2,
   Clock,
@@ -44,12 +45,13 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
   const isOwner = user?.role === 'superadmin';
 
-  // Owner Sidebar Navigation matching 2nd photo exactly:
-  // Dashboard -> Pesanan -> Stok -> Absensi -> Team -> Riwayat -> Notifikasi -> Profile
+  // Owner Sidebar Navigation:
+  // Dashboard -> Pesanan -> Stok -> Menu -> Absensi -> Team -> Riwayat -> Notifikasi -> Profile
   const ownerNavItems: { id: DashboardTab; label: string; icon: any; badge?: number }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'orders', label: 'Pesanan', icon: ShoppingBag, badge: orders.filter(o => o.status === 'pending').length },
     { id: 'inventory', label: 'Stok', icon: Package, badge: stockItems.filter(s => s.currentStock <= s.minStock).length },
+    { id: 'menu', label: 'Menu', icon: Utensils },
     { id: 'attendance', label: 'Absensi', icon: CalendarCheck },
     { id: 'team', label: 'Team', icon: Users2 },
     { id: 'reports', label: 'Riwayat', icon: Clock },
@@ -57,7 +59,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
     { id: 'profile', label: 'Profile', icon: UserIcon },
   ];
 
-  // Kasir Sidebar Navigation (Matching photo items + Kasir POS)
+  // Kasir Sidebar Navigation (Kasir POS + Operasional dasar, tanpa Menu)
   const cashierNavItems: { id: DashboardTab; label: string; icon: any; badge?: number }[] = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutGrid },
     { id: 'pos', label: 'Kasir POS', icon: ShoppingBag },
@@ -127,7 +129,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
           </nav>
         </div>
 
-        {/* Bottom: Logout / Keluar Button matching 2nd photo */}
+        {/* Bottom: Logout / Keluar Button */}
         <div className="pt-4 border-t border-[#F1F1EF]">
           <button
             onClick={logout}
@@ -209,7 +211,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
               <MenuIcon className="w-5 h-5" />
             </button>
 
-            {/* Search Input: Q Cari anggota, peran... or Q Cari order ID... */}
+            {/* Search Input */}
             <div className="relative w-full">
               <input
                 type="text"
@@ -224,7 +226,7 @@ export const DashboardLayout: React.FC<DashboardLayoutProps> = ({ children }) =>
 
           {/* Right: Date, Notification Bell, Profile */}
           <div className="flex items-center gap-3 md:gap-4 shrink-0">
-            {/* Date: 📅 Rabu, 16 Sep 2026 */}
+            {/* Date */}
             <div className="hidden sm:flex items-center gap-1.5 text-xs text-[#737373] font-medium">
               <Calendar className="w-3.5 h-3.5 text-[#737373]" />
               <span>
