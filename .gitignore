@@ -44,3 +44,6 @@ next-env.d.ts
 # local dev database
 /.pgdata/
 /.pgdata.log
+
+# local tooling
+/.claude/
