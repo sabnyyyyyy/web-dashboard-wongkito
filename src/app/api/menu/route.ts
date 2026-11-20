@@ -1,13 +1,18 @@
 import { createMenuItem, listMenu, parseMenuInput } from '@/backend/menu';
+import { roleFromLoginId } from '@/shared/access';
 import { handle, json, readJsonBody, requireOwner, requireSession } from '@/backend/http';
+
+
 
 const OWNER_ONLY = 'Hanya Owner yang boleh mengubah menu.';
 
 // Any logged-in staff: the POS needs the menu.
 export async function GET(request: Request) {
   return handle(request, async () => {
-    await requireSession();
-    return json({ menu: await listMenu() });
+    const session = await requireSession();
+    const role = roleFromLoginId(session.account.login_id);
+    const onlyAvailable = role !== 'superadmin';
+    return json({ menu: await listMenu(onlyAvailable) });
   });
 }
 

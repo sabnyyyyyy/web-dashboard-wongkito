@@ -48,8 +48,14 @@ export const parseMenuInput = (body: Record<string, unknown>): MenuInput => ({
   popular: requireBoolean(body.popular ?? false, 'Status populer'),
 });
 
-export const listMenu = async (): Promise<MenuItem[]> => {
-  const { rows } = await query<MenuRow>(`SELECT ${COLUMNS} FROM menu_items ORDER BY created_at, name`);
+export const listMenu = async (onlyAvailable?: boolean): Promise<MenuItem[]> => {
+  let sql = `SELECT ${COLUMNS} FROM menu_items`;
+  const params: any[] = [];
+  if (onlyAvailable) {
+    sql += ' WHERE is_available = true';
+  }
+  sql += ' ORDER BY created_at, name';
+  const { rows } = await query<MenuRow>(sql, params);
   return rows.map(toMenuItem);
 };
 
@@ -98,7 +104,7 @@ export const updateMenuItem = async (id: string, input: MenuInput): Promise<Menu
 };
 
 export const deleteMenuItem = async (id: string): Promise<void> => {
-  // Past orders keep their own snapshot of the item, so deleting it doesn't touch history.
-  const { rowCount } = await query('DELETE FROM menu_items WHERE id = $1', [id]);
+  // Soft delete: mark as unavailable instead of removing the row.
+  const { rowCount } = await query('UPDATE menu_items SET is_available = false WHERE id = $1', [id]);
   if (!rowCount) throw new HttpError(404, 'Menu tidak ditemukan.');
 };

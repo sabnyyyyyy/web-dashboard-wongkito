@@ -1,4 +1,6 @@
 import 'server-only';
+import crypto from 'crypto';
+import { logInfo, logWarn, logError } from './logger';
 import { AccountStatus } from '@/shared/types';
 import { getCurrentSession, CurrentSession } from './session';
 import { roleFromLoginId } from '@/shared/access';
@@ -24,21 +26,88 @@ export class HttpError extends Error {
   }
 }
 
-// Wraps a route handler: same-origin check for writes, typed errors → JSON, unknown errors → 500.
-export const handle = async (request: Request, fn: () => Promise<Response>): Promise<Response> => {
+// ---------------------------------------------------------------------------
+// Request context — allows route handlers to attach userId for logging
+// without adding a new auth query.
+// ---------------------------------------------------------------------------
+
+export interface RequestContext {
+  /** Set by route handlers after they call requireSession(). */
+  userId?: string | null;
+}
+
+// ---------------------------------------------------------------------------
+// handle() — wraps a route handler with logging, request-ID, and error handling
+// ---------------------------------------------------------------------------
+
+export const handle = async (
+  request: Request,
+  fn: (ctx: RequestContext) => Promise<Response>,
+): Promise<Response> => {
+  const requestId = crypto.randomUUID();
+  const startTime = Date.now();
+  const pathname = new URL(request.url).pathname;
+  const ctx: RequestContext = { userId: null };
+
+  const baseMeta = () => ({
+    requestId,
+    method: request.method,
+    pathname,
+    userId: ctx.userId ?? null,
+  });
+
   try {
     if (request.method !== 'GET' && !isSameOrigin(request)) {
       throw new HttpError(403, 'Permintaan ditolak.');
     }
-    return await fn();
+
+    const response = await fn(ctx);
+
+    // Attach request ID header.
+    response.headers.set('X-Request-Id', requestId);
+
+    const durationMs = Date.now() - startTime;
+    logInfo('Request completed', {
+      ...baseMeta(),
+      status: response.status,
+      durationMs,
+    });
+
+    return response;
   } catch (err) {
-    if (err instanceof HttpError) return apiError(err.status, err.message);
-    if (err instanceof Error && err.message.startsWith('DATABASE_URL')) {
-      console.error('[api]', err.message);
-      return apiError(503, 'Server belum terhubung ke database.');
+    const durationMs = Date.now() - startTime;
+    const baseHeaders = { 'X-Request-Id': requestId };
+
+    if (err instanceof HttpError) {
+      logWarn('HTTP error', {
+        ...baseMeta(),
+        status: err.status,
+        durationMs,
+        errorCode: `HTTP_${err.status}`,
+        errorName: 'HttpError',
+      });
+      return apiError(err.status, err.message, baseHeaders);
     }
-    console.error('[api] unexpected error', err);
-    return apiError(500, 'Terjadi kesalahan di server. Coba lagi.');
+
+    if (err instanceof Error && err.message.startsWith('DATABASE_URL')) {
+      logError('Database connection error', {
+        ...baseMeta(),
+        status: 503,
+        durationMs,
+        errorCode: 'DB_CONNECTION',
+        errorName: err.name,
+      });
+      return apiError(503, 'Server belum terhubung ke database.', baseHeaders);
+    }
+
+    logError('Unexpected server error', {
+      ...baseMeta(),
+      status: 500,
+      durationMs,
+      errorCode: 'INTERNAL_ERROR',
+      errorName: err instanceof Error ? err.name : 'Unknown',
+    });
+    return apiError(500, 'Terjadi kesalahan di server. Coba lagi.', baseHeaders);
   }
 };
 

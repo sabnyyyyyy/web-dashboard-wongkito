@@ -75,7 +75,7 @@ dashboard-wongkito/
 │   │   ├── db.ts               # Koneksi PostgreSQL
 │   │   ├── schema.sql          # Skema tabel
 │   │   ├── seed-data.ts        # Data awal menu, stok, pengaturan
-│   │   ├── accounts.ts  session.ts  password-hash.ts  rate-limit.ts  http.ts
+│   │   ├── accounts.ts  session.ts  password-hash.ts  rate-limit.ts  http.ts  logger.ts
 │   │   └── menu.ts  orders.ts  stock.ts  settings.ts
 │   └── shared/                 # Dipakai frontend & backend
 │       ├── access.ts           # Aturan role & akses halaman
@@ -225,7 +225,17 @@ Butuh Node.js dan PostgreSQL (versi 13 ke atas).
 
 ---
 
+## 📚 Dokumentasi Fitur
+
+* [📚 Dokumentasi Sistem Logging](docs/LOGGING.md) – Menjelaskan arsitektur, format, retensi, pengujian, dan cara membaca log transaksi & audit.
+* [🍽️ Dokumentasi Manajemen Menu](docs/MENU.md) – Menjelaskan katalog menu, hak akses Owner vs. Kasir, modal Tambah/Edit via React Portal, soft-delete, pencarian, dan filter kategori.
+* [📦 Dokumentasi Manajemen Inventory](docs/INVENTORY.md) – Menjelaskan kontrol stok bahan baku, modal Update Stok, aksi cepat `+ Stok` dan `− Stok`, proteksi stok negatif, serta pembaruan statistik otomatis.
+
+---
+
 ## 🔑 Akun & Login
+
+[📚 Dokumentasi Logging](docs/LOGGING.md) (menjelaskan arsitektur, format, retensi, dan cara membaca log)
 
 * **Owner:** `OWN-001`, password dari `npm run db:setup` (ganti lewat menu Profile setelah login).
 * **Kasir:** dibuat oleh Owner di menu **Team** (ID `KSR-001`, `KSR-002`, ...), lengkap dengan password awalnya.
