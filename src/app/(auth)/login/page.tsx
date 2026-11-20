@@ -2,8 +2,8 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/app/_context/AuthContext';
-import { LoginPage } from './_components/LoginPage';
+import { useAuth } from '@/frontend/context/AuthContext';
+import { LoginPage } from '@/frontend/views/login/LoginPage';
 
 export default function LoginRoute() {
   const { isAuthenticated, isLoading } = useAuth();

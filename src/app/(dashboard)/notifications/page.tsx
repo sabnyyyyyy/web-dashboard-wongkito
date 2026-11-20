@@ -1,4 +1,4 @@
-import { NotificationsView } from './_components/NotificationsView';
+import { NotificationsView } from '@/frontend/views/notifications/NotificationsView';
 
 export default function NotificationsPage() {
   return <NotificationsView />;

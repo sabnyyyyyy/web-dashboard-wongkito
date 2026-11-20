@@ -1,4 +1,4 @@
-import { PosView } from './_components/PosView';
+import { PosView } from '@/frontend/views/pos/PosView';
 
 export default function PosPage() {
   return <PosView />;

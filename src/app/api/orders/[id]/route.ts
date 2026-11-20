@@ -1,6 +1,6 @@
-import { ORDER_STATUSES, updateOrderStatus } from '@/server/orders';
-import { handle, HttpError, json, readJsonBody, requireOneOf, requireSession } from '@/server/http';
-import { roleFromLoginId } from '@/lib/access';
+import { ORDER_STATUSES, updateOrderStatus } from '@/backend/orders';
+import { handle, HttpError, json, readJsonBody, requireOneOf, requireSession } from '@/backend/http';
+import { roleFromLoginId } from '@/shared/access';
 
 // Kitchen flow: { status: 'accepted' | 'processing' | 'ready' | 'completed' | 'cancelled' }.
 // Kasir moves orders along; only the owner may cancel one.

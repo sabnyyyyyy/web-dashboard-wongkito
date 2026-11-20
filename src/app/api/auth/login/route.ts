@@ -1,9 +1,9 @@
-import { attemptLogin, toUser } from '@/server/accounts';
-import { createSession } from '@/server/session';
-import { apiError, clientIp, handle, json, readJsonBody, requireString } from '@/server/http';
-import { consumeRateLimit } from '@/server/rate-limit';
-import { normalizeLoginId, roleFromLoginId } from '@/lib/access';
-import { MAX_PASSWORD_LENGTH } from '@/lib/password';
+import { attemptLogin, toUser } from '@/backend/accounts';
+import { createSession } from '@/backend/session';
+import { apiError, clientIp, handle, json, readJsonBody, requireString } from '@/backend/http';
+import { consumeRateLimit } from '@/backend/rate-limit';
+import { normalizeLoginId, roleFromLoginId } from '@/shared/access';
+import { MAX_PASSWORD_LENGTH } from '@/shared/password';
 
 const IP_LIMIT = 30;
 const IP_WINDOW_MS = 10 * 60 * 1000;

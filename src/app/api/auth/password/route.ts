@@ -1,9 +1,9 @@
-import { setPassword } from '@/server/accounts';
-import { verifyPassword } from '@/server/password-hash';
-import { revokeSessions } from '@/server/session';
-import { handle, HttpError, noContent, readJsonBody, requireSession, requireString } from '@/server/http';
-import { consumeRateLimit } from '@/server/rate-limit';
-import { MAX_PASSWORD_LENGTH, validateNewPassword } from '@/lib/password';
+import { setPassword } from '@/backend/accounts';
+import { verifyPassword } from '@/backend/password-hash';
+import { revokeSessions } from '@/backend/session';
+import { handle, HttpError, noContent, readJsonBody, requireSession, requireString } from '@/backend/http';
+import { consumeRateLimit } from '@/backend/rate-limit';
+import { MAX_PASSWORD_LENGTH, validateNewPassword } from '@/shared/password';
 
 // Change own password. Other devices are logged out; this one stays signed in.
 export async function POST(request: Request) {

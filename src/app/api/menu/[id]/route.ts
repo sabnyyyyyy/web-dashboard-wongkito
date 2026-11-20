@@ -1,5 +1,5 @@
-import { deleteMenuItem, parseMenuInput, updateMenuItem } from '@/server/menu';
-import { handle, json, noContent, readJsonBody, requireOwner } from '@/server/http';
+import { deleteMenuItem, parseMenuInput, updateMenuItem } from '@/backend/menu';
+import { handle, json, noContent, readJsonBody, requireOwner } from '@/backend/http';
 
 const OWNER_ONLY = 'Hanya Owner yang boleh mengubah menu.';
 

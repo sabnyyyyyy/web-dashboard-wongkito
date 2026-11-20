@@ -1,7 +1,7 @@
-import { resetKasirPassword } from '@/server/accounts';
-import { revokeSessions } from '@/server/session';
-import { handle, HttpError, json, requireOwner } from '@/server/http';
-import { normalizeLoginId } from '@/lib/access';
+import { resetKasirPassword } from '@/backend/accounts';
+import { revokeSessions } from '@/backend/session';
+import { handle, HttpError, json, requireOwner } from '@/backend/http';
+import { normalizeLoginId } from '@/shared/access';
 
 // Owner only: replace a kasir's password with a temporary one and log them out everywhere.
 export async function POST(request: Request, ctx: RouteContext<'/api/accounts/[loginId]/reset-password'>) {

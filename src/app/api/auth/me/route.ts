@@ -1,6 +1,6 @@
-import { toUser, updateName } from '@/server/accounts';
-import { getCurrentSession } from '@/server/session';
-import { handle, HttpError, json, readJsonBody, requireSession, requireString } from '@/server/http';
+import { toUser, updateName } from '@/backend/accounts';
+import { getCurrentSession } from '@/backend/session';
+import { handle, HttpError, json, readJsonBody, requireSession, requireString } from '@/backend/http';
 
 // Current user, or { user: null } when not logged in (not an error for the login screen).
 export async function GET(request: Request) {

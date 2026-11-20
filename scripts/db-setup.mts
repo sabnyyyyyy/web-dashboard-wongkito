@@ -7,8 +7,8 @@
 
 import { readFile } from 'node:fs/promises';
 import pg from 'pg';
-import { generateTempPassword, hashPassword } from '../src/server/password-hash.ts';
-import { INITIAL_MENU, INITIAL_STOCKS, INITIAL_STORE_SETTINGS } from '../src/server/seed-data.ts';
+import { generateTempPassword, hashPassword } from '../src/backend/password-hash.ts';
+import { INITIAL_MENU, INITIAL_STOCKS, INITIAL_STORE_SETTINGS } from '../src/backend/seed-data.ts';
 
 const OWNER_ID = 'OWN-001';
 const OWNER_NAME = 'Owner Warkop Wong Kito';
@@ -59,7 +59,7 @@ const main = async () => {
   await client.connect();
 
   try {
-    const schema = await readFile(new URL('../src/server/schema.sql', import.meta.url), 'utf8');
+    const schema = await readFile(new URL('../src/backend/schema.sql', import.meta.url), 'utf8');
     await client.query(schema);
     console.log('✓ Tabel akun, sesi, menu, stok, pesanan & pengaturan siap.');
     await seedStoreData(client);

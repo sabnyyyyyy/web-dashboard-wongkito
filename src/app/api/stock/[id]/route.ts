@@ -1,5 +1,5 @@
-import { parseStockInput, updateStockItem } from '@/server/stock';
-import { handle, json, readJsonBody, requireOwner } from '@/server/http';
+import { parseStockInput, updateStockItem } from '@/backend/stock';
+import { handle, json, readJsonBody, requireOwner } from '@/backend/http';
 
 // Owner only: add, reduce or edit a raw-material item.
 export async function PUT(request: Request, ctx: RouteContext<'/api/stock/[id]'>) {

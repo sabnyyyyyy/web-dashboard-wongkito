@@ -1,5 +1,5 @@
-import { createStockItem, listStock, parseStockInput } from '@/server/stock';
-import { handle, json, readJsonBody, requireOwner, requireSession } from '@/server/http';
+import { createStockItem, listStock, parseStockInput } from '@/backend/stock';
+import { handle, json, readJsonBody, requireOwner, requireSession } from '@/backend/http';
 
 const STOCK_OWNER_ONLY = 'Hanya Owner yang boleh mengubah stok.';
 

@@ -1,6 +1,6 @@
-import { createKasirAccount, listKasirAccounts } from '@/server/accounts';
-import { handle, HttpError, json, readJsonBody, requireOwner, requirePhone, requireString } from '@/server/http';
-import { validateNewPassword } from '@/lib/password';
+import { createKasirAccount, listKasirAccounts } from '@/backend/accounts';
+import { handle, HttpError, json, readJsonBody, requireOwner, requirePhone, requireString } from '@/backend/http';
+import { validateNewPassword } from '@/shared/password';
 
 // Owner only: list kasir accounts.
 export async function GET(request: Request) {

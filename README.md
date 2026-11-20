@@ -8,7 +8,7 @@ Sistem Manajemen Operasional & Kasir POS (*Point of Sale*) modern berbasis web u
 
 ### Backend & Database
 * **Data tersimpan di PostgreSQL**, tidak lagi di browser. Menu, pesanan, stok bahan baku, pengaturan toko, dan akun staf disimpan di database, jadi semua perangkat kasir melihat data yang sama.
-* **API baru** di `src/app/api/`: `/api/auth`, `/api/accounts`, `/api/menu`, `/api/stock`, `/api/orders`, `/api/settings`. Daftar lengkapnya ada di bagian [Backend](#3-backend-srcappapi-srcserver).
+* **API baru** di `src/app/api/`: `/api/auth`, `/api/accounts`, `/api/menu`, `/api/stock`, `/api/orders`, `/api/settings`. Daftar lengkapnya ada di bagian [Backend](#3-backend-srcappapi-srcbackend).
 * **Transaksi dihitung di server.** Harga, diskon, pajak PB1, total, kembalian, dan nomor nota (`WK-YYYYMMDD-XXX`) dihitung dari database, bukan dari browser. Stok porsi menu berkurang otomatis saat checkout dan kembali saat pesanan dibatalkan.
 * **Setup database sekali jalan:** `npm run db:setup` membuat tabel, data awal (menu, stok, pengaturan), dan akun Owner pertama. Lupa password Owner? `npm run db:reset-owner`.
 
@@ -23,7 +23,7 @@ Sistem Manajemen Operasional & Kasir POS (*Point of Sale*) modern berbasis web u
 
 ### Tampilan & Struktur
 * **Satu URL per halaman:** `/dashboard`, `/pos`, `/orders`, `/menu`, `/inventory`, `/reports`, `/attendance`, `/team`, `/notifications`, `/profile`, `/settings`. Halaman bisa di-bookmark, dan tombol back browser berfungsi.
-* **Semua komponen dipindah ke dalam `src/app`.** Komponen tiap fitur ada di folder halamannya (`_components`), sedangkan yang dipakai bersama ada di `src/app/_components`.
+* **Frontend, backend, dan kode bersama dipisah per folder** (tetap satu project Next.js, satu `npm run dev`): tampilan di `src/frontend`, logika server & database di `src/backend`, aturan & tipe yang dipakai keduanya di `src/shared`. `src/app` hanya berisi routing: `page.tsx` yang memanggil view dari `src/frontend/views`, dan `api/*/route.ts` yang memanggil fungsi dari `src/backend`.
 * **Dashboard, Pesanan, Riwayat, dan Stok** menampilkan angka dan data asli dari database, bukan contoh statis.
 
 > **Belum tersambung ke database:** halaman **Absensi** dan **Notifikasi**, grafik di Overview, serta kotak "Kehadiran" dan "AI Insight" di Dashboard masih memakai data contoh.
@@ -38,7 +38,7 @@ Sistem Manajemen Operasional & Kasir POS (*Point of Sale*) modern berbasis web u
 * **Ikonografi & Visual:** [Lucide React](https://lucide.dev), [Recharts](https://recharts.org), [Canvas Confetti](https://www.npmjs.com/package/canvas-confetti)
 * **State Management:** React Context API (`AuthContext` & `AppContext`) dengan persistensi lokal (`localStorage`)
 * **Audio Engine:** Web Audio API (Synthesizer efek suara tanpa aset eksternal)
-* **Backend:** Next.js Route Handlers (`src/app/api/*`) dengan logika server di `src/server/*`
+* **Backend:** Next.js Route Handlers (`src/app/api/*`) dengan logika server di `src/backend/*`
 * **Database:** [PostgreSQL](https://www.postgresql.org) 13+ melalui library [`pg`](https://node-postgres.com). Sejak pembaruan November 2026, data menu, pesanan, stok, pengaturan, dan akun disimpan di sini, tidak lagi di `localStorage`.
 
 ---
@@ -48,41 +48,40 @@ Sistem Manajemen Operasional & Kasir POS (*Point of Sale*) modern berbasis web u
 ```text
 dashboard-wongkito/
 ├── public/                     # Aset statis dan logo aplikasi
+├── scripts/
+│   └── db-setup.mts            # npm run db:setup / db:reset-owner
 ├── src/
-│   ├── app/                    # Next.js App Router root
+│   ├── app/                    # ROUTING saja (Next.js App Router wajib di sini)
 │   │   ├── layout.tsx          # Root layout, penyedia Auth & App Provider, font
 │   │   ├── page.tsx            # Redirect ke /dashboard (sudah login) atau /login
 │   │   ├── globals.css         # Konfigurasi Tailwind CSS, font, & styling cetak struk (@media print)
-│   │   ├── api/                # Route handler backend (auth & manajemen akun)
-│   │   ├── (auth)/login/       # Halaman /login (+ _components/LoginPage.tsx)
-│   │   ├── (dashboard)/        # Semua halaman setelah login, tiap fitur punya URL sendiri
-│   │   │   ├── layout.tsx      # Guard login & role, shell DashboardLayout, ReceiptModal
-│   │   │   ├── dashboard/      # /dashboard     – ringkasan analitik dan KPI operasional
-│   │   │   ├── pos/            # /pos           – interface transaksi kasir (Point of Sale)
-│   │   │   ├── orders/         # /orders        – monitor pesanan aktif dan alur dapur
-│   │   │   ├── menu/           # /menu          – CRUD katalog produk (Owner)
-│   │   │   ├── inventory/      # /inventory     – bahan baku dan peringatan stok menipis
-│   │   │   ├── reports/        # /reports       – rekap penjualan dan laporan pendapatan
-│   │   │   ├── attendance/     # /attendance    – absensi dan kehadiran staf
-│   │   │   ├── team/           # /team          – manajemen akun kasir (Owner)
-│   │   │   ├── notifications/  # /notifications – notifikasi pesanan & stok
-│   │   │   ├── profile/        # /profile       – profil akun dan ganti password
-│   │   │   └── settings/       # /settings      – konfigurasi outlet (Owner)
-│   │   │                       #   (tiap folder: page.tsx + _components/<View>.tsx)
-│   │   ├── _components/        # Komponen bersama (private folder, tidak jadi route)
-│   │   │   ├── common/         # ReceiptModal untuk nota belanja
+│   │   ├── api/                # Route handler tipis → memanggil fungsi di src/backend
+│   │   ├── (auth)/login/       # /login → views/login/LoginPage.tsx
+│   │   └── (dashboard)/        # Semua halaman setelah login, tiap fitur punya URL sendiri
+│   │       ├── layout.tsx      # Guard login & role, shell DashboardLayout, ReceiptModal
+│   │       └── <fitur>/page.tsx  # dashboard, pos, orders, menu, inventory, reports,
+│   │                             # attendance, team, notifications, profile, settings
+│   ├── frontend/               # FRONTEND (komponen React, berjalan di browser)
+│   │   ├── views/<fitur>/      # Isi tiap halaman (PosView.tsx, OrdersView.tsx, ...)
+│   │   ├── components/
+│   │   │   ├── common/         # ReceiptModal, PasswordChecklist
 │   │   │   └── layout/         # Shell navigasi (Sidebar responsif, Header, Topbar, Search)
-│   │   ├── _context/           # Global State Management
+│   │   ├── context/
 │   │   │   ├── AppContext.tsx  # State bisnis (menu, pesanan, keranjang POS, stok, setting)
 │   │   │   └── AuthContext.tsx # State autentikasi sesi pengguna (Owner / Kasir)
-│   │   ├── _data/
-│   │   │   └── mockData.ts     # Data contoh grafik di OverviewView
-│   │   └── _utils/
-│   │       └── format.ts       # Format mata uang Rupiah, waktu lokal, dan Web Audio chime
-│   ├── lib/                    # Helper bersama client & server (akses role, aturan password)
-│   ├── server/                 # Logika backend (database, sesi, rate limit, hashing, data seed)
-│   └── types/
-│       └── index.ts            # Kontrak tipe dan interface TypeScript
+│   │   ├── data/mockData.ts    # Data contoh grafik di OverviewView
+│   │   └── utils/              # api.ts (fetch ke /api), format.ts (Rupiah, waktu, chime)
+│   ├── backend/                # BACKEND (hanya jalan di server)
+│   │   ├── db.ts               # Koneksi PostgreSQL
+│   │   ├── schema.sql          # Skema tabel
+│   │   ├── seed-data.ts        # Data awal menu, stok, pengaturan
+│   │   ├── accounts.ts  session.ts  password-hash.ts  rate-limit.ts  http.ts
+│   │   └── menu.ts  orders.ts  stock.ts  settings.ts
+│   └── shared/                 # Dipakai frontend & backend
+│       ├── access.ts           # Aturan role & akses halaman
+│       ├── password.ts         # Aturan password
+│       ├── phone.ts            # Aturan nomor telepon
+│       └── types.ts            # Kontrak tipe dan interface TypeScript
 ├── package.json
 └── tsconfig.json
 ```
@@ -131,7 +130,7 @@ flowchart TD
 
 ## 🧩 Analisis Modul & Fungsi-Fungsi Kunci
 
-### 1. Global State Management (`src/app/_context/AppContext.tsx`)
+### 1. Global State Management (`src/frontend/context/AppContext.tsx`)
 Menu, pesanan, stok, dan pengaturan toko dimuat dari API setelah login. Setiap perubahan dikirim ke server; keranjang POS tetap di browser. Pesanan dimuat ulang otomatis tiap 15 detik supaya kasir dan dapur di perangkat lain melihat pesanan yang sama.
 * `addToCart(item, notes)` / `updateCartQuantity(itemId, delta)`: Mengelola keranjang POS (lokal).
 * `createOrder(order)`: Mengirim keranjang ke `POST /api/orders`. Server menghitung ulang harga, pajak, dan kembalian, membuat nomor nota `WK-YYYYMMDD-XXX`, dan mengurangi stok porsi menu.
@@ -141,12 +140,12 @@ Menu, pesanan, stok, dan pengaturan toko dimuat dari API setelah login. Setiap p
 * `updateSettings`: Simpan pengaturan toko & nota (khusus Owner).
 * Semua fungsi yang mengubah data mengembalikan `false` jika gagal, dan pesan error dari server sudah ditampilkan.
 
-### 2. Autentikasi Pengguna (`src/app/_context/AuthContext.tsx`)
+### 2. Autentikasi Pengguna (`src/frontend/context/AuthContext.tsx`)
 * `login(loginId, password, rememberMe)`: Login dengan ID login (`OWN-001`, `KSR-001`, ...). Role ditentukan dari prefix ID.
 * `logout()`: Mengakhiri sesi di server.
 * `createKasirAccount` / `updateKasirAccount` / `resetKasirPassword`: Manajemen akun kasir oleh Owner.
 
-### 3. Backend (`src/app/api/*`, `src/server/*`)
+### 3. Backend (`src/app/api/*`, `src/backend/*`)
 | Endpoint | Akses | Fungsi |
 | --- | --- | --- |
 | `/api/auth/*` | publik / login | Login, logout, sesi aktif, ganti password & nama |
@@ -156,19 +155,19 @@ Menu, pesanan, stok, dan pengaturan toko dimuat dari API setelah login. Setiap p
 | `GET/POST /api/orders`, `PATCH /api/orders/[id]` | login (batalkan: Owner) | Transaksi POS & alur dapur |
 | `GET/PUT /api/settings` | baca: login, ubah: Owner | Pengaturan toko |
 
-Skema tabel ada di `src/server/schema.sql`; data awal (menu, stok, pengaturan) ada di `src/server/seed-data.ts` dan hanya dimasukkan ke tabel yang masih kosong.
+Skema tabel ada di `src/backend/schema.sql`; data awal (menu, stok, pengaturan) ada di `src/backend/seed-data.ts` dan hanya dimasukkan ke tabel yang masih kosong.
 
-### 4. Komponen Nota Kasir (`src/app/_components/common/ReceiptModal.tsx`)
+### 4. Komponen Nota Kasir (`src/frontend/components/common/ReceiptModal.tsx`)
 * Menampilkan antarmuka struk bergaya printer thermal 58mm/80mm (`#thermal-receipt`).
 * Memuat rincian toko (nama, alamat, no. telepon dari `settings`), detail nomor nota, kasir bertugas, meja/tipe pesanan, rincian menu beserta catatan, subtotal, diskon, pajak, nominal tunai, dan kembalian.
 * Fungsi `handlePrint()` memanggil `window.print()` yang dipadukan dengan style `@media print` sehingga yang tercetak di kertas hanyalah kertas struk tanpa elemen dashboard lainnya.
 
-### 5. Format & Web Audio Helper (`src/app/_utils/format.ts`)
+### 5. Format & Web Audio Helper (`src/frontend/utils/format.ts`)
 * `formatRupiah(amount)`: Memformat angka ke format standar mata uang Rupiah Indonesia (contoh: `Rp 18.000`).
 * `formatDateTime(dateString)` & `formatTimeOnly(dateString)`: Mengonversi format ISO ke format penanggalan lokal Indonesia (`id-ID`).
 * `playChime(type)`: Memanfaatkan Web Audio API peramban untuk menghasilkan efek bunyi audio synthesizer tanpa membutuhkan file `.mp3` eksternal (`success`, `alert`, `click`).
 
-### 6. Kontrak Tipe Data (`src/types/index.ts`)
+### 6. Kontrak Tipe Data (`src/shared/types.ts`)
 Mendefinisikan entitas data utama:
 * `User`: Informasi pengguna dan hak akses (`superadmin` | `kasir`).
 * `MenuItem`: Data produk katalog, kategori, harga jual, HPP (*cost price*), dan stok porsi.
@@ -230,5 +229,5 @@ Butuh Node.js dan PostgreSQL (versi 13 ke atas).
 
 * **Owner:** `OWN-001`, password dari `npm run db:setup` (ganti lewat menu Profile setelah login).
 * **Kasir:** dibuat oleh Owner di menu **Team** (ID `KSR-001`, `KSR-002`, ...), lengkap dengan password awalnya.
-* **Syarat password baru** (buat akun kasir & ganti password): minimal 8 karakter, ada huruf besar, huruf kecil, angka, dan simbol, tanpa spasi. Aturannya di `src/lib/password.ts`, dipakai bersama oleh form dan API.
-* **Nomor telepon** hanya angka (boleh diawali `+`, dipisah spasi atau `-`), 9–15 digit. Aturannya di `src/lib/phone.ts`.
+* **Syarat password baru** (buat akun kasir & ganti password): minimal 8 karakter, ada huruf besar, huruf kecil, angka, dan simbol, tanpa spasi. Aturannya di `src/shared/password.ts`, dipakai bersama oleh form dan API.
+* **Nomor telepon** hanya angka (boleh diawali `+`, dipisah spasi atau `-`), 9–15 digit. Aturannya di `src/shared/phone.ts`.

@@ -1,7 +1,7 @@
-import { updateKasirAccount } from '@/server/accounts';
-import { revokeSessions } from '@/server/session';
-import { handle, HttpError, json, readJsonBody, requireOwner, requirePhone, requireStatus, requireString } from '@/server/http';
-import { normalizeLoginId } from '@/lib/access';
+import { updateKasirAccount } from '@/backend/accounts';
+import { revokeSessions } from '@/backend/session';
+import { handle, HttpError, json, readJsonBody, requireOwner, requirePhone, requireStatus, requireString } from '@/backend/http';
+import { normalizeLoginId } from '@/shared/access';
 
 // Owner only: edit a kasir's profile or (de)activate it. Deactivation logs the kasir out everywhere.
 export async function PATCH(request: Request, ctx: RouteContext<'/api/accounts/[loginId]'>) {

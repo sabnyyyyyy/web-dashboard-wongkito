@@ -2,11 +2,11 @@
 
 import React, { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
-import { useAuth } from '@/app/_context/AuthContext';
-import { useApp } from '@/app/_context/AppContext';
-import { DashboardLayout } from '@/app/_components/layout/DashboardLayout';
-import { ReceiptModal } from '@/app/_components/common/ReceiptModal';
-import { canAccessTab } from '@/lib/access';
+import { useAuth } from '@/frontend/context/AuthContext';
+import { useApp } from '@/frontend/context/AppContext';
+import { DashboardLayout } from '@/frontend/components/layout/DashboardLayout';
+import { ReceiptModal } from '@/frontend/components/common/ReceiptModal';
+import { canAccessTab } from '@/shared/access';
 
 export default function DashboardGroupLayout({ children }: { children: React.ReactNode }) {
   const { isAuthenticated, isLoading, user } = useAuth();

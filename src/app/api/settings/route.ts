@@ -1,5 +1,5 @@
-import { getSettings, parseSettings, saveSettings } from '@/server/settings';
-import { handle, json, readJsonBody, requireOwner, requireSession } from '@/server/http';
+import { getSettings, parseSettings, saveSettings } from '@/backend/settings';
+import { handle, json, readJsonBody, requireOwner, requireSession } from '@/backend/http';
 
 // Any logged-in staff: receipts and the POS tax use these.
 export async function GET(request: Request) {
