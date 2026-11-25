@@ -24,7 +24,7 @@ Fitur Manajemen Menu dirancang dengan pembatasan hak akses berbasis peran (*Role
 
 ## 2. Navigasi Sidebar
 
-* **File Implementasi:** `src/frontend/components/layout/DashboardLayout.tsx`
+* **File Implementasi:** `frontend/src/components/layout/DashboardLayout.tsx`
 * **Label:** `Menu`
 * **Ikon:** Lucide React `Utensils`
 * **Posisi:** Terletak setelah menu **Stok** (`inventory`) dan sebelum **Absensi** (`attendance`).
@@ -35,7 +35,7 @@ Fitur Manajemen Menu dirancang dengan pembatasan hak akses berbasis peran (*Role
 
 ## 3. Desain Kartu Menu & Hierarki Visual
 
-* **File Implementasi:** `src/frontend/views/menu/MenuView.tsx`
+* **File Implementasi:** `frontend/src/views/menu/MenuView.tsx`
 * **Layout Grid:** Responsif (`grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4`).
 * **Komposisi Kartu:**
   1. **Badge Kategori:** Terletak di kiri atas, menggunakan pill khas WKM (`text-[#F47C0B] bg-[#FFF7E8] border border-[#FFB21A]/40 text-[10px] uppercase font-bold`).

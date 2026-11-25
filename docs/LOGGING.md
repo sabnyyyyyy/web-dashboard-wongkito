@@ -1,10 +1,10 @@
 # Logging Documentation
 
 ## Overview
-The WKM web‑frontend includes a **custom structured logger** (`src/backend/logger.ts`).  It records every API request and error in **JSON Lines (JSONL)** format, both to the console and to a daily log file under `logs/`.
+The WKM backend (Express, `backend/`) includes a **custom structured logger** (`backend/src/utils/logger.ts`).  It records every API request and error in **JSON Lines (JSONL)** format, both to the console and to a daily log file under `backend/logs/`.
 
 ## Log File Layout
-- Location: `web-frontend/logs/`
+- Location: `backend/logs/` (the folder the backend is started from)
 - Filename pattern: `app-YYYY-MM-DD.jsonl` (e.g. `app-2026-11-19.jsonl`)
 - One JSON object per line.
 
@@ -49,24 +49,25 @@ The WKM web‑frontend includes a **custom structured logger** (`src/backend/log
 - Non‑log files or files that do not match the pattern are never removed.
 
 ## How It Works
-1. **Request entry** – `src/backend/http.ts` generates a UUID, starts a timer, and builds a base metadata object.
-2. **Success** – after the handler resolves, the response header `X-Request-Id` is set and `logInfo` records the request details.
-3. **Error handling** – `HttpError` and unexpected errors are caught, appropriate `logWarn` / `logError` calls are made, and a JSON error response is returned.
+1. **Request entry** – a middleware in `backend/src/server.ts` generates a UUID, sets the `X-Request-Id` response header and starts a timer.
+2. **Response finished** – when the response is sent, the same middleware logs it: `logInfo` for 2xx/3xx, `logWarn` for 4xx, `logError` for 5xx.
+3. **Error handling** – controllers throw `HttpError` (or any error); the error handler at the end of `server.ts` turns it into a JSON `{ error }` response and records the error code for the log line.
 4. **File writing** – `logger.ts` ensures the `logs/` directory exists, appends a line to the current day’s file, and triggers retention cleanup.
 
 ## Viewing Logs (PowerShell)
 ```powershell
 # Show today’s log (most recent entries first)
-Get-Content logs/app-$(Get-Date -Format yyyy-MM-dd).jsonl | Sort-Object -Descending
+Get-Content backend/logs/app-$(Get-Date -Format yyyy-MM-dd).jsonl | Sort-Object -Descending
 
 # Filter for errors
-Get-Content logs/app-2026-11-19.jsonl | ConvertFrom-Json | Where-Object {$_.level -eq 'error'}
+Get-Content backend/logs/app-2026-11-19.jsonl | ConvertFrom-Json | Where-Object {$_.level -eq 'error'}
 ```
 
 ## Running Tests
 The repository includes a self‑contained test script:
 ```bash
-node scripts/test-logger.mjs
+cd backend
+npm run test:logger
 ```
 It validates:
 - Daily file creation and append‑only behavior.
@@ -76,9 +77,9 @@ It validates:
 All 30 assertions currently pass.
 
 ## Adding New Log Calls
-When you need to log additional information inside a route handler, import the logger functions:
+When you need to log additional information inside a controller, import the logger functions:
 ```ts
-import { logInfo, logWarn, logError } from '@/backend/logger';
+import { logInfo, logWarn, logError } from '../utils/logger.js';
 ```
 Pass a `LogMeta` object containing **only** the allow‑listed keys.
 
