@@ -1,21 +1,26 @@
 'use client';
 
-import React, { useState } from 'react';
+import React from 'react';
 import { useApp } from '@/context/AppContext';
 import { useAuth } from '@/context/AuthContext';
+import { useAttendance } from '@/hooks/useAttendance';
+import { todayDateInput } from '@/lib/attendance';
 import { Order } from '@/types';
-import { ArrowRight, CheckCircle2 } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 
 export const OwnerDashboardView: React.FC = () => {
   const { orders, stockItems, setActiveTab, setLastCompletedOrder, setShowReceiptModal } = useApp();
   const { user } = useAuth();
-  const [attendanceMsg, setAttendanceMsg] = useState<string>('');
 
-  const handleAbsen = (type: 'masuk' | 'pulang') => {
-    const time = new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-    setAttendanceMsg(`Absen ${type === 'masuk' ? 'Masuk' : 'Pulang'} berhasil dicatat pada ${time} WIB`);
-    setTimeout(() => setAttendanceMsg(''), 4000);
-  };
+  // Owner dashboard shows a read-only summary of every employee's attendance today.
+  const todayInput = todayDateInput();
+  const {
+    attendance: attendanceToday,
+    isLoading: attendanceLoading,
+    error: attendanceError,
+  } = useAttendance({ from: todayInput, to: todayInput });
+  const hadirCount = attendanceToday.filter((row) => row.status === 'Hadir').length;
+  const terlambatCount = attendanceToday.filter((row) => row.status === 'Terlambat').length;
 
   // Orders placed today (Asia/Jakarta calendar day, which is what the shop works by).
   const todayKey = (iso: string) => new Date(iso).toLocaleDateString('id-ID', { timeZone: 'Asia/Jakarta' });
@@ -71,13 +76,6 @@ export const OwnerDashboardView: React.FC = () => {
           &ldquo;Pantau aktivitas operasional Warkop Wong Kito hari ini.&rdquo;
         </p>
       </div>
-
-      {attendanceMsg && (
-        <div className="p-3 bg-emerald-50 border border-emerald-300 text-emerald-800 text-xs font-bold rounded-[8px] flex items-center gap-2 animate-fade-in">
-          <CheckCircle2 className="w-4 h-4 text-emerald-600" />
-          <span>{attendanceMsg}</span>
-        </div>
-      )}
 
       {/* 6 Horizontal Stat Cards: Radius 12px, Card Shadow, Spacing 12px */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -136,15 +134,23 @@ export const OwnerDashboardView: React.FC = () => {
           <span className="text-[10px] text-red-500 font-medium">Perlu restock segera</span>
         </div>
 
-        {/* Card 6 */}
+        {/* Card 6 — real attendance data from the server */}
         <div className="bg-white rounded-[12px] p-4 border border-[#F1F1EF] wkm-card-shadow flex flex-col justify-between">
           <span className="text-[10px] font-bold text-[#737373] uppercase tracking-wider">
             KEHADIRAN
           </span>
           <div className="my-2">
-            <span className="text-xl font-black text-emerald-600">Hadir</span>
+            {attendanceLoading ? (
+              <span className="text-sm font-black text-[#737373]">Memuat...</span>
+            ) : attendanceError ? (
+              <span className="text-sm font-black text-red-600">Gagal dimuat</span>
+            ) : (
+              <span className="text-xl font-black text-emerald-600">{hadirCount} Hadir</span>
+            )}
           </div>
-          <span className="text-[10px] text-emerald-600 font-medium">Aktif bertugas</span>
+          <span className="text-[10px] text-emerald-600 font-medium">
+            {attendanceError ? 'Coba muat ulang halaman' : `${terlambatCount} terlambat hari ini`}
+          </span>
         </div>
       </div>
 
@@ -167,17 +173,10 @@ export const OwnerDashboardView: React.FC = () => {
         </button>
 
         <button
-          onClick={() => handleAbsen('masuk')}
+          onClick={() => setActiveTab('attendance')}
           className="px-4 py-2 bg-white hover:bg-[#F1F1EF] text-[#525252] hover:text-[#242424] font-bold border border-[#F1F1EF] rounded-[8px] transition-all cursor-pointer"
         >
-          Absen Masuk
-        </button>
-
-        <button
-          onClick={() => handleAbsen('pulang')}
-          className="px-4 py-2 bg-white hover:bg-[#F1F1EF] text-[#525252] hover:text-[#242424] font-bold border border-[#F1F1EF] rounded-[8px] transition-all cursor-pointer"
-        >
-          Absen Pulang
+          Lihat Absensi
         </button>
       </div>
 

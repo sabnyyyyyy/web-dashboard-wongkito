@@ -1,11 +1,14 @@
 'use client';
 
-import React, { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import React, { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
+import { useSWRConfig } from 'swr';
 import { MenuItem, Order, StockItem, StoreSettings, CartItem, OrderStatus, OrderType, PaymentMethod, DashboardTab } from '@/types';
 import { playChime } from '@/utils/format';
 import { api, ApiError } from '@/utils/api';
 import { useAuth } from '@/context/AuthContext';
+import { menuKey, useMenu } from '@/hooks/useMenu';
+import { stockKey, useStock } from '@/hooks/useStock';
 
 // Menu, orders, stock and settings live in the database (/api/*); this context loads them after
 // login and sends every change to the server. Only the POS cart and UI state stay in the browser.
@@ -129,6 +132,10 @@ const EMPTY_SETTINGS: StoreSettings = {
 // How often open dashboards pick up orders taken on another device.
 const ORDER_REFRESH_MS = 15_000;
 
+// Stable empty references so consumers do not re-render on every provider render.
+const EMPTY_MENU: MenuItem[] = [];
+const EMPTY_STOCK: StockItem[] = [];
+
 const showError = (err: unknown) => {
   playChime('alert');
   alert(err instanceof Error ? err.message : 'Terjadi kesalahan. Coba lagi.');
@@ -142,6 +149,13 @@ const AppContext = createContext<AppContextType | undefined>(undefined);
 export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { user } = useAuth();
 
+  // SWR owns menu and stock. Keys include loginId so no data is shared between accounts.
+  const loginId = user?.loginId ?? null;
+  const menu = useMenu(loginId);
+  const stock = useStock(loginId);
+  const { mutate: mutateGlobal } = useSWRConfig();
+  const previousLoginIdRef = useRef<string | null>(null);
+
   // Every tab is its own route (/pos, /team, ...), so the active tab is read from the URL.
   const router = useRouter();
   const pathname = usePathname();
@@ -153,11 +167,20 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   );
   const [isOpenStore, setIsOpenStore] = useState<boolean>(true);
 
-  const [isDataLoading, setIsDataLoading] = useState<boolean>(true);
-  const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
+  // Only orders and settings still use local state. Menu and stock come from SWR below.
+  const [isCoreLoading, setIsCoreLoading] = useState<boolean>(true);
   const [orders, setOrders] = useState<Order[]>([]);
-  const [stockItems, setStockItems] = useState<StockItem[]>([]);
   const [settings, setSettings] = useState<StoreSettings>(EMPTY_SETTINGS);
+
+  const menuItems = loginId ? (menu.data ?? EMPTY_MENU) : EMPTY_MENU;
+  const stockItems = loginId ? (stock.data ?? EMPTY_STOCK) : EMPTY_STOCK;
+  const menuMutate = menu.mutate;
+  const stockMutate = stock.mutate;
+
+  const menuErrorKey = menu.error ? `${menu.error.status}:${menu.error.message}` : null;
+  const stockErrorKey = stock.error ? `${stock.error.status}:${stock.error.message}` : null;
+  const lastMenuErrorKey = useRef<string | null>(null);
+  const lastStockErrorKey = useRef<string | null>(null);
 
   // Cart
   const [cart, setCart] = useState<CartItem[]>([]);
@@ -173,30 +196,25 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   // Notifications (kept in the browser for this session)
   const [notifications, setNotifications] = useState<AppNotification[]>([]);
 
-  // Load everything once per login; reset when the user logs out or switches account.
-  const loginId = user?.loginId;
+  // Load the remaining non-SWR data once per login; reset on logout/account switch.
+  // SWR owns menu and stock, so they are intentionally not fetched here anymore.
   useEffect(() => {
+    previousLoginIdRef.current = loginId;
     if (!loginId) return;
+
     let cancelled = false;
 
-    Promise.all([
-      api<{ menu: MenuItem[] }>('/api/menu'),
-      api<{ orders: Order[] }>('/api/orders'),
-      api<{ stock: StockItem[] }>('/api/stock'),
-      api<{ settings: StoreSettings }>('/api/settings'),
-    ])
-      .then(([menuRes, ordersRes, stockRes, settingsRes]) => {
+    Promise.all([api<{ orders: Order[] }>('/api/orders'), api<{ settings: StoreSettings }>('/api/settings')])
+      .then(([ordersRes, settingsRes]) => {
         if (cancelled) return;
-        setMenuItems(menuRes.menu);
         setOrders(ordersRes.orders);
-        setStockItems(stockRes.stock);
         setSettings(settingsRes.settings);
       })
       .catch((err) => {
         if (!cancelled && !(err instanceof ApiError && err.status === 401)) showError(err);
       })
       .finally(() => {
-        if (!cancelled) setIsDataLoading(false);
+        if (!cancelled) setIsCoreLoading(false);
       });
 
     const refresh = setInterval(() => {
@@ -213,14 +231,47 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     return () => {
       cancelled = true;
       clearInterval(refresh);
-      setIsDataLoading(true);
-      setMenuItems([]);
+      setIsCoreLoading(true);
       setOrders([]);
-      setStockItems([]);
       setCart([]);
       setNotifications([]);
+
+      // Clear SWR entries of the account we are leaving. Never revalidate while clearing.
+      const staleLoginId = previousLoginIdRef.current;
+      if (staleLoginId) {
+        void mutateGlobal(menuKey(staleLoginId), undefined, { revalidate: false });
+        void mutateGlobal(stockKey(staleLoginId), undefined, { revalidate: false });
+      }
     };
-  }, [loginId]);
+  }, [loginId, mutateGlobal]);
+
+  // SWR exposes errors as state. Show each distinct error once; ignore session loss handled by auth.
+  useEffect(() => {
+    if (!menuErrorKey) {
+      lastMenuErrorKey.current = null;
+      return;
+    }
+    if (lastMenuErrorKey.current === menuErrorKey) return;
+    lastMenuErrorKey.current = menuErrorKey;
+    if (menu.error && menu.error.status !== 401) showError(menu.error);
+  }, [menuErrorKey, menu.error]);
+
+  useEffect(() => {
+    if (!stockErrorKey) {
+      lastStockErrorKey.current = null;
+      return;
+    }
+    if (lastStockErrorKey.current === stockErrorKey) return;
+    lastStockErrorKey.current = stockErrorKey;
+    if (stock.error && stock.error.status !== 401) showError(stock.error);
+  }, [stockErrorKey, stock.error]);
+
+  // An SWR error resolves the waiting state instead of leaving the dashboard loading forever.
+  // While logged out there is no dashboard data to wait for.
+  const waitingForCore = !!loginId && isCoreLoading;
+  const waitingForSWR =
+    !!loginId && ((menu.data === undefined && !menu.error) || (stock.data === undefined && !stock.error));
+  const isDataLoading = waitingForCore || waitingForSWR;
 
   // Menu Methods
   const saveMenuItem = async (id: string | null, item: Omit<MenuItem, 'id'>): Promise<boolean> => {
@@ -229,7 +280,10 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: id ? 'PUT' : 'POST',
         body: item,
       });
-      setMenuItems((prev) => (id ? replaceById(prev, saved) : [...prev, saved]));
+      await menuMutate(
+        (current) => (id ? replaceById(current ?? [], saved) : [...(current ?? []), saved]),
+        { revalidate: true }
+      );
       return true;
     } catch (err) {
       showError(err);
@@ -249,7 +303,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const deleteMenuItem = async (id: string) => {
     try {
       await api(`/api/menu/${encodeURIComponent(id)}`, { method: 'DELETE' });
-      setMenuItems((prev) => prev.filter((item) => item.id !== id));
+      await menuMutate((current) => (current ?? []).filter((item) => item.id !== id), { revalidate: true });
       return true;
     } catch (err) {
       showError(err);
@@ -330,13 +384,21 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     }
 
     setOrders((prev) => [newOrder, ...prev]);
-    // Sold portions changed on the server; take the fresh numbers for the menu grid.
-    setMenuItems((prev) =>
-      prev.map((m) => {
-        const sold = newOrder.items.find((ci) => ci.menuItem.id === m.id);
-        return sold ? { ...m, stock: sold.menuItem.stock } : m;
-      })
-    );
+    // The checkout response contains menu items returned after the stock deduction.
+    // Patch the SWR cache with those authoritative numbers; revalidate only if they are missing.
+    const hasFreshMenuStock = newOrder.items.every((ci) => typeof ci.menuItem?.stock === 'number');
+    if (hasFreshMenuStock && menu.data) {
+      await menuMutate(
+        (current) =>
+          (current ?? []).map((m) => {
+            const sold = newOrder.items.find((ci) => ci.menuItem.id === m.id);
+            return sold ? sold.menuItem : m;
+          }),
+        { revalidate: false }
+      );
+    } else {
+      void menuMutate();
+    }
     setLastCompletedOrder(newOrder);
     setShowReceiptModal(true);
     clearCart();
@@ -364,10 +426,8 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       });
       setOrders((prev) => replaceById(prev, order));
       if (newStatus === 'cancelled') {
-        // Cancelling returned the portions to the menu stock.
-        api<{ menu: MenuItem[] }>('/api/menu')
-          .then((res) => setMenuItems(res.menu))
-          .catch(() => {});
+        // Cancelling returned the portions to the menu stock; revalidate the SWR cache.
+        void menuMutate();
       }
       return true;
     } catch (err) {
@@ -380,7 +440,9 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
   const addStockItem = async (item: StockItemInput) => {
     try {
       const { item: saved } = await api<{ item: StockItem }>('/api/stock', { method: 'POST', body: item });
-      setStockItems((prev) => [...prev, saved].sort((a, b) => a.name.localeCompare(b.name)));
+      await stockMutate((current) => [...(current ?? []), saved].sort((a, b) => a.name.localeCompare(b.name)), {
+        revalidate: true,
+      });
       return true;
     } catch (err) {
       showError(err);
@@ -396,7 +458,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
         method: 'PUT',
         body: { ...current, ...updates },
       });
-      setStockItems((prev) => replaceById(prev, saved));
+      await stockMutate((current) => replaceById(current ?? [], saved), { revalidate: true });
       return true;
     } catch (err) {
       showError(err);
