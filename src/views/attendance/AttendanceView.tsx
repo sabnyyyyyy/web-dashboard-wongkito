@@ -1,15 +1,15 @@
 'use client';
 
-import React, { useMemo, useState } from 'react';
+import React, { useState } from 'react';
 import { AlertCircle, CheckCircle2, Eye, History, LogIn, LogOut, Pencil, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { useAttendance, useAttendanceCorrections } from '@/hooks/useAttendance';
+import { useAttendance, useAttendanceCorrections, useAttendanceSummary } from '@/hooks/useAttendance';
 import { useToast } from '@/hooks/useToast';
 import { formatDisplayDate, formatDuration, formatTime, STATUS_LABEL, todayDateInput } from '@/lib/attendance';
 import { playChime } from '@/utils/format';
 import type { AttendanceCorrection, AttendanceRecord, AttendanceStatus } from '@/types';
 
-const PAGE_SIZE = 5;
+const PAGE_SIZE = 10;
 
 type CorrectionForm = {
   checkInTime: string;
@@ -47,42 +47,40 @@ export const AttendanceView: React.FC = () => {
   const invalidRange = !!from && !!to && from > to;
   const activeFrom = isOwner && !invalidRange ? from || null : null;
   const activeTo = isOwner && !invalidRange ? to || null : null;
+  const activeEmployee = isOwner ? employee.trim() : '';
+  const activeStatus = isOwner && statusFilter !== 'Semua' ? statusFilter : null;
 
-  const { attendance, today: myToday, isLoading, error, checkIn, checkOut, correctAttendance } = useAttendance({
+  const { attendance, pagination, today: myToday, isLoading, error, checkIn, checkOut, correctAttendance } = useAttendance({
     from: activeFrom,
     to: activeTo,
+    page: currentPage,
+    limit: PAGE_SIZE,
+    employee: activeEmployee,
+    status: activeStatus,
   });
-  // Separate SWR key so the "today" cards never follow the table's date filter.
-  const { attendance: todaySummary, isLoading: todaySummaryLoading } = useAttendance({
-    from: isOwner ? today : null,
-    to: isOwner ? today : null,
+  // Separate keys keep the "today" cards and the rekap independent of table pagination.
+  const { summary: todaySummary, isLoading: todaySummaryLoading } = useAttendanceSummary({
+    from: today,
+    to: today,
+    enabled: isOwner,
+  });
+  const { summary: rekapSummary } = useAttendanceSummary({
+    from: activeFrom,
+    to: activeTo,
+    employee: activeEmployee,
+    status: activeStatus,
   });
   const { corrections, isLoading: correctionsLoading, error: correctionsError } = useAttendanceCorrections(
     isOwner ? selected?.id ?? null : null
   );
 
-  const filtered = useMemo(() => {
-    let rows = attendance;
-    if (isOwner) {
-      const keyword = employee.trim().toLowerCase();
-      if (keyword) {
-        rows = rows.filter(
-          (row) =>
-            row.staffName.toLowerCase().includes(keyword) || row.loginId.toLowerCase().includes(keyword)
-        );
-      }
-      if (statusFilter !== 'Semua') rows = rows.filter((row) => row.status === statusFilter);
-    }
-    return rows;
-  }, [attendance, employee, isOwner, statusFilter]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / PAGE_SIZE));
+  const totalPages = Math.max(1, pagination.totalPages);
+  // Clamp for rendering: stale page state must never leave the table empty after data shrinks.
   const page = Math.min(currentPage, totalPages);
-  const displayedLogs = filtered.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE);
   const columnCount = isOwner ? 8 : 7;
 
-  const hadirCount = todaySummary.filter((row) => row.status === 'Hadir').length;
-  const terlambatCount = todaySummary.filter((row) => row.status === 'Terlambat').length;
+  const hadirCount = todaySummary.hadir;
+  const terlambatCount = todaySummary.terlambat;
 
   const statusPresensi: 'BELUM ABSEN' | 'HADIR' | 'TERLAMBAT' | 'SELESAI' = !myToday
     ? 'BELUM ABSEN'
@@ -312,7 +310,10 @@ export const AttendanceView: React.FC = () => {
               <input
                 type="date"
                 value={from}
-                onChange={(event) => setFrom(event.target.value)}
+                onChange={(event) => {
+                  setFrom(event.target.value);
+                  setCurrentPage(1);
+                }}
                 className="px-2.5 py-1.5 border border-[#E5E7EB] rounded-[6px] text-xs text-[#242424]"
               />
             </label>
@@ -321,7 +322,10 @@ export const AttendanceView: React.FC = () => {
               <input
                 type="date"
                 value={to}
-                onChange={(event) => setTo(event.target.value)}
+                onChange={(event) => {
+                  setTo(event.target.value);
+                  setCurrentPage(1);
+                }}
                 className="px-2.5 py-1.5 border border-[#E5E7EB] rounded-[6px] text-xs text-[#242424]"
               />
             </label>
@@ -330,7 +334,10 @@ export const AttendanceView: React.FC = () => {
               <input
                 type="text"
                 value={employee}
-                onChange={(event) => setEmployee(event.target.value)}
+                onChange={(event) => {
+                  setEmployee(event.target.value);
+                  setCurrentPage(1);
+                }}
                 placeholder="Nama atau ID login"
                 className="px-2.5 py-1.5 border border-[#E5E7EB] rounded-[6px] text-xs text-[#242424] w-44"
               />
@@ -339,7 +346,10 @@ export const AttendanceView: React.FC = () => {
               <span className="text-[10px] font-bold text-[#737373] uppercase tracking-wider">STATUS</span>
               <select
                 value={statusFilter}
-                onChange={(event) => setStatusFilter(event.target.value as 'Semua' | AttendanceStatus)}
+                onChange={(event) => {
+                  setStatusFilter(event.target.value as 'Semua' | AttendanceStatus);
+                  setCurrentPage(1);
+                }}
                 className="px-2.5 py-1.5 border border-[#E5E7EB] rounded-[6px] text-xs text-[#242424]"
               >
                 <option value="Semua">Semua</option>
@@ -389,7 +399,7 @@ export const AttendanceView: React.FC = () => {
                     </td>
                   </tr>
                 )}
-                {!isLoading && !error && displayedLogs.length === 0 && (
+                {!isLoading && !error && attendance.length === 0 && (
                   <tr>
                     <td colSpan={columnCount} className="py-6 px-5 text-center text-[#737373]">
                       Tidak ada data absensi.
@@ -398,7 +408,7 @@ export const AttendanceView: React.FC = () => {
                 )}
                 {!isLoading &&
                   !error &&
-                  displayedLogs.map((log, index) => (
+                  attendance.map((log, index) => (
                     <tr key={log.id} className="hover:bg-stone-50/70 transition-colors">
                       <td className="py-3.5 px-4 md:px-5 text-[#737373] font-medium">
                         {String((page - 1) * PAGE_SIZE + index + 1).padStart(2, '0')}
@@ -443,12 +453,12 @@ export const AttendanceView: React.FC = () => {
 
           <div className="bg-white border-t border-[#E5E7EB] p-3 px-4 md:px-5 flex flex-col sm:flex-row items-center justify-between gap-3 text-xs">
             <span className="text-[10px] font-bold text-[#737373] uppercase tracking-wider">
-              TAMPILKAN {displayedLogs.length} DARI {filtered.length} LOG PRESENSI
+              TAMPILKAN {attendance.length} DARI {pagination.total} LOG PRESENSI · TOTAL HALAMAN {pagination.totalPages}
             </span>
             <div className="flex items-center gap-1.5 text-xs">
               <button
-                disabled={page === 1}
-                onClick={() => setCurrentPage((prev) => Math.max(1, prev - 1))}
+                disabled={page === 1 || isLoading}
+                onClick={() => setCurrentPage(Math.max(1, page - 1))}
                 className="px-2.5 py-0.5 text-[10px] font-bold border border-[#D1D5DB] rounded-[4px] text-[#737373] hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed uppercase transition-colors cursor-pointer"
               >
                 &laquo; SEBELUMNYA
@@ -456,6 +466,7 @@ export const AttendanceView: React.FC = () => {
               {Array.from({ length: totalPages }, (_, index) => index + 1).map((pageNum) => (
                 <button
                   key={pageNum}
+                  disabled={isLoading}
                   onClick={() => setCurrentPage(pageNum)}
                   className={`px-2 py-0.5 rounded-[4px] text-xs font-bold transition-colors cursor-pointer ${
                     page === pageNum ? 'bg-[#1C1C1E] text-white' : 'border border-[#D1D5DB] text-[#525252] hover:bg-stone-50'
@@ -465,8 +476,8 @@ export const AttendanceView: React.FC = () => {
                 </button>
               ))}
               <button
-                disabled={page === totalPages}
-                onClick={() => setCurrentPage((prev) => Math.min(totalPages, prev + 1))}
+                disabled={page === totalPages || isLoading}
+                onClick={() => setCurrentPage(Math.min(totalPages, page + 1))}
                 className="px-2.5 py-0.5 text-[10px] font-bold border border-[#D1D5DB] rounded-[4px] text-[#737373] hover:bg-stone-50 disabled:opacity-40 disabled:cursor-not-allowed uppercase transition-colors cursor-pointer"
               >
                 SELANJUTNYA &raquo;
@@ -489,11 +500,11 @@ export const AttendanceView: React.FC = () => {
           <div className="space-y-1 text-xs">
             <div className="flex items-center justify-between">
               <span className="text-[#525252]">Total Hadir:</span>
-              <span className="font-bold text-[#242424]">{filtered.filter((row) => row.status === 'Hadir').length} Hari</span>
+              <span className="font-bold text-[#242424]">{rekapSummary.hadir} Hari</span>
             </div>
             <div className="flex items-center justify-between">
               <span className="text-[#525252]">Total Terlambat:</span>
-              <span className="font-bold text-red-600">{filtered.filter((row) => row.status === 'Terlambat').length} Kali</span>
+              <span className="font-bold text-red-600">{rekapSummary.terlambat} Kali</span>
             </div>
           </div>
         </div>

@@ -123,6 +123,29 @@ export interface AttendanceCorrection {
   correctedAt: string;
 }
 
+// Mirrors backend-ikhsan/src/utils/types.ts. totalPages is 0 when there is no data.
+export interface AttendancePagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+export interface AttendanceListResponse {
+  attendance: AttendanceRecord[];
+  pagination: AttendancePagination;
+}
+
+export interface AttendanceSummary {
+  hadir: number;
+  terlambat: number;
+  total: number;
+}
+
+export interface AttendanceSummaryResponse {
+  summary: AttendanceSummary;
+}
+
 // Dashboard pages (URL segments). Lives here so shared access rules don't import from the frontend.
 export type DashboardTab =
   | 'dashboard'

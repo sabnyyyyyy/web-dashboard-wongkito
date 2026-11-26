@@ -5,20 +5,49 @@ import { useSWRConfig } from 'swr';
 import { useAuth } from '@/context/AuthContext';
 import { useCache } from '@/hooks/useCache';
 import { ApiError, api } from '@/utils/api';
-import type { AttendanceCorrection, AttendanceRecord, AttendanceStatus } from '@/types';
+import type {
+  AttendanceCorrection,
+  AttendanceListResponse,
+  AttendancePagination,
+  AttendanceRecord,
+  AttendanceStatus,
+  AttendanceSummary,
+  AttendanceSummaryResponse,
+} from '@/types';
 
 // All attendance keys live in the same global SWR cache used by useMenu/useStock.
 // The loginId is part of every key so data can never be shared between accounts.
-export const attendanceKey = (loginId: string | null, from: string | null, to: string | null) =>
-  loginId ? (['attendance', loginId, from, to] as const) : null;
+export const attendanceKey = (
+  loginId: string | null,
+  from: string | null,
+  to: string | null,
+  page: number,
+  limit: number,
+  employee: string,
+  status: AttendanceStatus | null
+) =>
+  loginId ? (['attendance', loginId, from, to, page, limit, employee, status] as const) : null;
 
 export const attendanceTodayKey = (loginId: string | null) => (loginId ? (['attendance-today', loginId] as const) : null);
 
 export const attendanceCorrectionKey = (loginId: string | null, attendanceId: string | null) =>
   loginId && attendanceId ? (['attendance-corrections', loginId, attendanceId] as const) : null;
 
+export const attendanceSummaryKey = (
+  loginId: string | null,
+  from: string | null,
+  to: string | null,
+  employee: string,
+  status: AttendanceStatus | null,
+  enabled = true
+) => (loginId && enabled ? (['attendance-summary', loginId, from, to, employee, status] as const) : null);
+
 const isAttendanceCacheKey = (key: unknown): boolean =>
-  Array.isArray(key) && (key[0] === 'attendance' || key[0] === 'attendance-today' || key[0] === 'attendance-corrections');
+  Array.isArray(key) &&
+  (key[0] === 'attendance' ||
+    key[0] === 'attendance-today' ||
+    key[0] === 'attendance-corrections' ||
+    key[0] === 'attendance-summary');
 
 // SWR stores keys as serialized strings in its global cache. The original array is kept as
 // the internal `_k` field, so match against that and delete with the real cache key string.
@@ -30,13 +59,36 @@ const isStaleAccountEntry = (cache: { get(key: string): unknown }, cacheKey: str
   return isAttendanceCacheKey(original) && Array.isArray(original) && original[1] === staleLoginId;
 };
 
-const listPath = (from: string | null, to: string | null): string => {
+export interface AttendanceQuery {
+  from?: string | null;
+  to?: string | null;
+  page?: number;
+  limit?: number;
+  employee?: string;
+  status?: AttendanceStatus | null;
+}
+
+export interface AttendanceSummaryQuery extends AttendanceQuery {
+  enabled?: boolean;
+}
+
+const filterParams = ({ from = null, to = null, employee = '', status = null }: AttendanceQuery): URLSearchParams => {
   const params = new URLSearchParams();
   if (from) params.set('from', from);
   if (to) params.set('to', to);
-  const query = params.toString();
-  return query ? `/api/attendance?${query}` : '/api/attendance';
+  if (employee) params.set('employee', employee);
+  if (status) params.set('status', status);
+  return params;
 };
+
+const listPath = (query: AttendanceQuery): string => {
+  const params = filterParams(query);
+  params.set('page', String(query.page ?? 1));
+  params.set('limit', String(query.limit ?? 10));
+  return `/api/attendance?${params.toString()}`;
+};
+
+const summaryPath = (query: AttendanceQuery): string => `/api/attendance/summary?${filterParams(query).toString()}`;
 
 export interface AttendanceCorrectionInput {
   checkInTime?: string;
@@ -45,16 +97,20 @@ export interface AttendanceCorrectionInput {
   reason: string;
 }
 
-export const useAttendance = ({ from = null, to = null }: { from?: string | null; to?: string | null } = {}) => {
+export const useAttendance = (query: AttendanceQuery = {}) => {
   const { user, logout } = useAuth();
   const loginId = user?.loginId ?? null;
   const { cache, mutate: mutateGlobal } = useSWRConfig();
 
-  const path = listPath(from, to);
-  const fetchList = useCallback(async () => (await api<{ attendance: AttendanceRecord[] }>(path)).attendance, [path]);
+  const { from = null, to = null, page = 1, limit = 10, employee = '', status = null } = query;
+  const path = listPath(query);
+  const fetchList = useCallback(async () => (await api<AttendanceListResponse>(path)), [path]);
   const fetchToday = useCallback(async () => (await api<{ attendance: AttendanceRecord | null }>('/api/attendance/today')).attendance, []);
 
-  const list = useCache<AttendanceRecord[]>(attendanceKey(loginId, from, to), fetchList);
+  const list = useCache<AttendanceListResponse>(
+    attendanceKey(loginId, from, to, page, limit, employee, status),
+    fetchList
+  );
   const today = useCache<AttendanceRecord | null>(attendanceTodayKey(loginId), fetchToday);
 
   const previousLoginId = useRef<string | null>(null);
@@ -130,8 +186,11 @@ export const useAttendance = ({ from = null, to = null }: { from?: string | null
     [applyMutation]
   );
 
+  const fallbackPagination: AttendancePagination = { page, limit, total: 0, totalPages: 0 };
+
   return {
-    attendance: list.data ?? [],
+    attendance: list.data?.attendance ?? [],
+    pagination: list.data?.pagination ?? fallbackPagination,
     today: today.data ?? null,
     isLoading: list.isLoading || today.isLoading,
     isValidating: list.isValidating || today.isValidating,
@@ -139,6 +198,29 @@ export const useAttendance = ({ from = null, to = null }: { from?: string | null
     checkIn,
     checkOut,
     correctAttendance,
+  };
+};
+
+export const useAttendanceSummary = (query: AttendanceSummaryQuery = {}) => {
+  const { user, logout } = useAuth();
+  const loginId = user?.loginId ?? null;
+  const { from = null, to = null, employee = '', status = null, enabled = true } = query;
+  const path = summaryPath(query);
+
+  const fetchSummary = useCallback(async () => (await api<AttendanceSummaryResponse>(path)).summary, [path]);
+  const result = useCache<AttendanceSummary>(
+    attendanceSummaryKey(loginId, from, to, employee, status, enabled),
+    fetchSummary
+  );
+
+  useEffect(() => {
+    if (result.error instanceof ApiError && result.error.status === 401) void logout();
+  }, [result.error, logout]);
+
+  return {
+    summary: result.data ?? { hadir: 0, terlambat: 0, total: 0 },
+    isLoading: result.isLoading,
+    error: result.error ?? null,
   };
 };
 
