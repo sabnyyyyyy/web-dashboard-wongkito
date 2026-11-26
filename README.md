@@ -29,7 +29,7 @@ Status berikut mengikuti kode yang ada, bukan rencana.
 | Menu management | Terintegrasi | Menu dibaca/mutasi melalui SWR + `/api/menu`; hanya owner yang mengelola. |
 | Inventory / Stock | Terintegrasi | Stok dibaca/mutasi melalui SWR + `/api/stock`; kasir bersifat read-only. |
 | Team management | Terintegrasi | Buat/edit akun kasir dan reset password melalui `/api/accounts` (owner only). |
-| Attendance | Terintegrasi* | Absen kasir, ringkasan owner, koreksi + audit history. **Membutuhkan backend dengan endpoint Attendance terbaru** (lihat bagian Attendance). |
+| Attendance | Terintegrasi | Absen kasir, tabel pagination server-side 10 data/halaman, filter, rekap dari endpoint summary, koreksi + audit history (lihat bagian Attendance). |
 | Reports | Sebagian | Riwayat pesanan diambil server-side dari `/api/orders`; tab log presensi belum tersedia di halaman ini. |
 | Settings | Terintegrasi | Profil toko, pajak, struk, dan WiFi disimpan ke `/api/settings`; cache info toko di refresh saat simpan. |
 | Notifications | Statik | Masih memakai data contoh di `NotificationsView.tsx`; bukan notifikasi backend/realtime. |
@@ -38,23 +38,28 @@ Status berikut mengikuti kode yang ada, bukan rencana.
 
 Fitur absensi berjalan melalui endpoint Attendance backend dan terbagi per role:
 
-- **Kasir**: check-in dan check-out harian. Waktu & tanggal ditentukan server (Asia/Jakarta), bukan browser.
+- **Kasir**: check-in dan check-out harian. Waktu & tanggal ditentukan server (Asia/Jakarta), bukan browser. Tabel hanya berisi absensi milik sendiri.
 - **Owner**: melihat absensi seluruh karyawan, dilengkapi filter rentang tanggal, nama/ID login, dan status (`Hadir`/`Terlambat`).
+- **Pagination server-side**: tabel meminta `page` dan `limit=10` ke backend. Tidak ada pemotongan array di browser; tombol halaman dan penomoran memakai objek `pagination` dari response.
+- **Filter**: `from`, `to`, `employee`, dan `status` dikirim ke backend. Setiap perubahan filter mengembalikan halaman ke `1`.
+- **Rekap/summary**: panel **REKAP** memakai `GET /api/attendance/summary` untuk owner maupun kasir. Kartu **Kehadiran Hari Ini** pada owner juga memakai endpoint summary dengan filter tanggal hari ini; kasir memakai `GET /api/attendance/today` untuk kartu status harian. Summary dihitung backend dari seluruh data hasil filter—bukan dari 10 data halaman aktif.
+- **Cache SWR**: key list menyertakan `loginId`, filter, `page`, dan `limit`. Cache dibersihkan saat berganti akun dan ikut di-revalidate setelah check-in/check-out/koreksi.
 - **Detail per baris**: menampilkan karyawan, tanggal, jam masuk/pulang, durasi, dan status.
 - **Koreksi owner**: mengubah jam masuk, jam pulang, dan/atau status dengan **alasan wajib**.
 - **Audit history**: setiap koreksi tercatat sebagai riwayat perubahan yang dapat dilihat owner.
-- **Keamanan data**: cache SWR dibersihkan saat berganti akun; 401 menyebabkan logout; owner tidak dapat melakukan check-in/check-out.
+- **Keamanan data**: 401 menyebabkan logout; owner tidak dapat melakukan check-in/check-out.
 
 Endpoint yang dipakai frontend:
 
-- `GET /api/attendance` (opsional `from`, `to`)
+- `GET /api/attendance` (`from`, `to`, `page`, `limit`, `employee`, `status`; `employee`/`status` hanya dikirim owner)
+- `GET /api/attendance/summary` (`from`, `to`, `employee`, `status`)
 - `GET /api/attendance/today`
 - `POST /api/attendance/check-in`
 - `POST /api/attendance/check-out`
 - `PATCH /api/attendance/:id/correct`
 - `GET /api/attendance/:id/corrections`
 
-> Catatan: koreksi belum mendukung penghapusan jam pulang—mengosongkan input check-out tidak mengirim perubahan ke server. Fitur ini juga baru akan berfungsi penuh bila backend menyediakan endpoint di atas dan tabel audit `attendance_corrections` sudah tersedia.
+> Catatan: koreksi belum mendukung penghapusan jam pulang—mengosongkan input check-out tidak mengirim perubahan ke server. Fitur ini membutuhkan backend branch `ikhsan` yang menyediakan endpoint pagination/summary di atas dan tabel audit `attendance_corrections`.
 
 ## Project Structure
 
@@ -121,7 +126,7 @@ Endpoint yang digunakan frontend mencakup grup: `/api/auth/*`, `/api/accounts*`,
 - **Notifications** masih memakai array contoh; belum ada integrasi backend atau pembaruan realtime.
 - **Dashboard**: panel *AI Ringkasan Harian* di `OwnerDashboardView` masih teks statik. Halaman **Overview** juga memakai `src/data/mockData.ts` dan beberapa angka contoh untuk chart/KPI.
 - **Reports** baru menampilkan riwayat pesanan; belum ada tab log presensi meskipun judul halaman menyebutkannya.
-- **Attendance**: koreksi belum bisa menghapus jam pulang, dan seluruh fitur bergantung pada backend versi terbaru.
+- **Attendance**: koreksi belum bisa menghapus jam pulang, dan seluruh fitur bergantung pada backend branch `ikhsan` yang menyediakan endpoint pagination/summary.
 - **Mobile**: repository ini hanya berisi web frontend. Tidak ada klaim integrasi dengan aplikasi mobile.
 
 ## Scripts
